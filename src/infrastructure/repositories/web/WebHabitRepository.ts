@@ -1,0 +1,102 @@
+import { endOfWeek, startOfWeek, subDays } from 'date-fns';
+import type { Habit, HabitStats } from '../../../domain/entities/Habit';
+import type {
+  CreateHabitInput,
+  HabitRepository,
+} from '../../../domain/repositories/HabitRepository';
+import { toIsoDate } from '../../../shared/utils/date';
+import { clamp } from '../../../shared/utils/formatters';
+import { readWebState, updateWebState } from './storage';
+
+export class WebHabitRepository implements HabitRepository {
+  async listActiveHabits(): Promise<Habit[]> {
+    const state = readWebState();
+    return state.habits.filter((habit) => habit.isActive);
+  }
+
+  async createHabit(input: CreateHabitInput): Promise<void> {
+    updateWebState((state) => ({
+      ...state,
+      habits: [
+        {
+          id: input.id,
+          name: input.name,
+          frequency: input.frequency,
+          targetPerWeek: input.targetPerWeek,
+          category: input.category,
+          isActive: true,
+          createdAt: input.createdAt,
+        },
+        ...state.habits,
+      ],
+    }));
+  }
+
+  async logCompletion(habitId: string, completedAt: string): Promise<boolean> {
+    let inserted = false;
+    updateWebState((state) => {
+      const already = state.habitLogs.some(
+        (log) => log.habitId === habitId && log.completedAt === completedAt,
+      );
+      if (already) {
+        inserted = false;
+        return state;
+      }
+      inserted = true;
+      return {
+        ...state,
+        habitLogs: [...state.habitLogs, { habitId, completedAt }],
+      };
+    });
+    return inserted;
+  }
+
+  async getStats(referenceDate: Date): Promise<HabitStats> {
+    const state = readWebState();
+    const activeHabits = state.habits.filter((habit) => habit.isActive);
+    const today = toIsoDate(referenceDate);
+    const weekStart = toIsoDate(
+      startOfWeek(referenceDate, { weekStartsOn: 1 }),
+    );
+    const weekEnd = toIsoDate(endOfWeek(referenceDate, { weekStartsOn: 1 }));
+
+    const todayCompleted = new Set(
+      state.habitLogs
+        .filter((log) => log.completedAt === today)
+        .map((log) => log.habitId),
+    ).size;
+
+    const weekCompletions = state.habitLogs.filter(
+      (log) => log.completedAt >= weekStart && log.completedAt <= weekEnd,
+    ).length;
+
+    const weeklyTarget = activeHabits.reduce(
+      (acc, habit) => acc + habit.targetPerWeek,
+      0,
+    );
+    const weeklyCompletionRate =
+      weeklyTarget === 0
+        ? 0
+        : clamp((weekCompletions / weeklyTarget) * 100, 0, 100);
+
+    const completionDaySet = new Set(
+      state.habitLogs
+        .map((log) => log.completedAt)
+        .sort((a, b) => (a < b ? 1 : -1)),
+    );
+
+    let streakDays = 0;
+    let cursor = referenceDate;
+    while (completionDaySet.has(toIsoDate(cursor))) {
+      streakDays += 1;
+      cursor = subDays(cursor, 1);
+    }
+
+    return {
+      activeHabitsCount: activeHabits.length,
+      todayCompleted,
+      weeklyCompletionRate,
+      streakDays,
+    };
+  }
+}
