@@ -38,6 +38,27 @@ const backupSchema = z.object({
       claimedMissionIds: z.array(z.string()).optional().default([]),
       unlockedAchievementIds: z.array(z.string()).optional().default([]),
       ownedAvatarItems: z.array(z.string()).optional().default(['seedling']),
+      rewardHistory: z
+        .array(
+          z.object({
+            id: z.string(),
+            createdAt: z.string(),
+            source: z.enum([
+              'event',
+              'mission',
+              'achievement',
+              'shop',
+              'freeze',
+              'system',
+            ]),
+            reason: z.string(),
+            xpDelta: z.number().int(),
+            coinsDelta: z.number().int(),
+            dimension: z.enum(['discipline', 'finance', 'learning', 'system']),
+          }),
+        )
+        .optional()
+        .default([]),
       avatarColor: z.string(),
       avatarItem: z.string(),
     }),

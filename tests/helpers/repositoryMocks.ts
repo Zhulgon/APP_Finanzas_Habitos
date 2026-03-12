@@ -47,6 +47,7 @@ const emptyProfile: UserProfile = {
   claimedMissionIds: [],
   unlockedAchievementIds: [],
   ownedAvatarItems: ['seedling'],
+  rewardHistory: [],
   avatarColor: '#0f766e',
   avatarItem: 'seedling',
 };

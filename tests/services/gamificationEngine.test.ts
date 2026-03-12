@@ -25,6 +25,7 @@ describe('GamificationEngine', () => {
       claimedMissionIds: [],
       unlockedAchievementIds: [],
       ownedAvatarItems: ['seedling'],
+      rewardHistory: [],
       avatarColor: '#0f766e',
       avatarItem: 'seedling',
     }));
@@ -51,6 +52,7 @@ describe('GamificationEngine', () => {
         claimedMissionIds: [],
         unlockedAchievementIds: [],
         ownedAvatarItems: ['seedling'],
+        rewardHistory: [],
         avatarColor: '#0f766e',
         avatarItem: 'seedling',
       }),
@@ -74,6 +76,7 @@ describe('GamificationEngine', () => {
     expect(applyGamificationSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         dimension: 'discipline',
+        auditSource: 'event',
       }),
     );
 

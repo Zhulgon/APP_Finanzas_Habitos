@@ -15,6 +15,8 @@ const processEventReward = async (
     dimension: reward.dimension,
     dimensionXpDelta: reward.xp,
     coinsDelta: reward.coins,
+    auditSource: 'event',
+    auditReason: reward.reason,
   });
 };
 
@@ -43,4 +45,3 @@ export const bindGamificationEngine = (
     }
   };
 };
-

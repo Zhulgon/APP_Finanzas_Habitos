@@ -5,6 +5,7 @@ import type {
   ProfileRepository,
   UpdateProfileInput,
 } from '../../../domain/repositories/ProfileRepository';
+import { createId } from '../../../shared/utils/id';
 import { readWebState, updateWebState } from './storage';
 
 export class WebProfileRepository implements ProfileRepository {
@@ -69,6 +70,24 @@ export class WebProfileRepository implements ProfileRepository {
         ownedAvatarItems.add(input.unlockAvatarItem);
       }
 
+      const shouldAppendAudit = Boolean(input.auditReason && input.auditSource);
+      const auditDimension: UserProfile['rewardHistory'][number]['dimension'] =
+        input.dimension ?? 'system';
+      const nextRewardHistory: UserProfile['rewardHistory'] = shouldAppendAudit
+        ? [
+            {
+              id: createId('reward'),
+              createdAt: input.auditCreatedAt ?? new Date().toISOString(),
+              source: input.auditSource!,
+              reason: input.auditReason!,
+              xpDelta: totalXpDelta,
+              coinsDelta,
+              dimension: auditDimension,
+            },
+            ...current.rewardHistory,
+          ].slice(0, 120)
+        : current.rewardHistory;
+
       return {
         ...state,
         profile: {
@@ -89,6 +108,7 @@ export class WebProfileRepository implements ProfileRepository {
           claimedMissionIds: Array.from(claimedMissionIds),
           unlockedAchievementIds: Array.from(unlockedAchievementIds),
           ownedAvatarItems: Array.from(ownedAvatarItems),
+          rewardHistory: nextRewardHistory,
         },
       };
     });

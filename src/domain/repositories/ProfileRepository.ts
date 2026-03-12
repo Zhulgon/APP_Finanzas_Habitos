@@ -1,4 +1,8 @@
-import type { GamificationDimension, UserProfile } from '../entities/Profile';
+import type {
+  GamificationDimension,
+  RewardHistorySource,
+  UserProfile,
+} from '../entities/Profile';
 
 export interface UpdateProfileInput {
   name: string;
@@ -21,6 +25,9 @@ export interface ApplyGamificationInput {
   claimedMissionId?: string;
   unlockedAchievementId?: string;
   unlockAvatarItem?: string;
+  auditSource?: RewardHistorySource;
+  auditReason?: string;
+  auditCreatedAt?: string;
 }
 
 export interface ProfileRepository {

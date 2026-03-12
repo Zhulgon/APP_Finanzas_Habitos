@@ -202,9 +202,9 @@ export const DashboardScreen = () => {
             <Text style={styles.actionTitle}>Aprender 5 min</Text>
             <Text style={styles.actionDescription}>Completa una capsula financiera.</Text>
           </Pressable>
-          <Pressable style={styles.actionCard} onPress={() => navigation.navigate('Perfil')}>
-            <Text style={styles.actionTitle}>Editar perfil</Text>
-            <Text style={styles.actionDescription}>Ajusta objetivo, avatar y recordatorios.</Text>
+          <Pressable style={styles.actionCard} onPress={() => navigation.navigate('Progreso')}>
+            <Text style={styles.actionTitle}>Revisar progreso</Text>
+            <Text style={styles.actionDescription}>Abre timeline, logros y rendimiento.</Text>
           </Pressable>
         </View>
       </SectionCard>

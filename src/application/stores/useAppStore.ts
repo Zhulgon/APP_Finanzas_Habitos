@@ -212,6 +212,8 @@ const applyProgressionRewards = async (snapshots: SnapshotResult): Promise<boole
     await repositories.profileRepository.applyGamification({
       streakFreezesDelta: 1,
       lastFreezeGrantMonth: currentMonth,
+      auditSource: 'system',
+      auditReason: 'Comodin mensual otorgado',
     });
     hasChanges = true;
   }
@@ -234,6 +236,8 @@ const applyProgressionRewards = async (snapshots: SnapshotResult): Promise<boole
       totalXpDelta: 12,
       dimensionXpDelta: 12,
       coinsDelta: 3,
+      auditSource: 'achievement',
+      auditReason: `Logro desbloqueado: ${achievementId}`,
     });
     hasChanges = true;
   }
@@ -246,6 +250,8 @@ const applyProgressionRewards = async (snapshots: SnapshotResult): Promise<boole
       totalXpDelta: mission.rewardXp,
       dimensionXpDelta: mission.rewardXp,
       coinsDelta: mission.rewardCoins,
+      auditSource: 'mission',
+      auditReason: `Mision completada: ${mission.title}`,
     });
     hasChanges = true;
   }
@@ -409,6 +415,8 @@ export const useAppStore = create<AppState>((set) => ({
     await repositories.profileRepository.applyGamification({
       coinsDelta: -Math.max(0, cost),
       unlockAvatarItem: item,
+      auditSource: 'shop',
+      auditReason: `Compra item avatar: ${item}`,
     });
 
     const snapshots = await refreshSnapshotsWithProgression();
@@ -484,6 +492,8 @@ export const useAppStore = create<AppState>((set) => ({
 
     await repositories.profileRepository.applyGamification({
       streakFreezesDelta: -1,
+      auditSource: 'freeze',
+      auditReason: `Comodin usado para proteger ${missedDate}`,
     });
 
     const snapshots = await refreshSnapshotsWithProgression();

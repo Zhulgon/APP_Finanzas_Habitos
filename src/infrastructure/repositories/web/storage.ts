@@ -61,6 +61,7 @@ const defaultProfile: UserProfile = {
   claimedMissionIds: [],
   unlockedAchievementIds: [],
   ownedAvatarItems: ['seedling'],
+  rewardHistory: [],
   avatarColor: '#0f766e',
   avatarItem: 'seedling',
 };
@@ -101,6 +102,7 @@ const readFromStorage = (): WebState | null => {
         claimedMissionIds: parsed.profile?.claimedMissionIds ?? [],
         unlockedAchievementIds: parsed.profile?.unlockedAchievementIds ?? [],
         ownedAvatarItems: parsed.profile?.ownedAvatarItems ?? ['seedling'],
+        rewardHistory: parsed.profile?.rewardHistory ?? [],
       },
       counters: {
         ...defaultState().counters,

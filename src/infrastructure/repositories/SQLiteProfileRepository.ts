@@ -6,6 +6,7 @@ import type {
 import type { UserProfile } from '../../domain/entities/Profile';
 import { levelFromXp, rankFromLevel } from '../../application/services/gamification';
 import { getDatabase } from '../database/database';
+import { createId } from '../../shared/utils/id';
 
 interface ProfileRow {
   name: string;
@@ -40,6 +41,7 @@ const mapProfile = (row: ProfileRow): UserProfile => ({
   claimedMissionIds: [],
   unlockedAchievementIds: [],
   ownedAvatarItems: ['seedling'],
+  rewardHistory: [],
   avatarColor: row.avatar_color,
   avatarItem: row.avatar_item,
 });
@@ -120,6 +122,23 @@ export class SQLiteProfileRepository implements ProfileRepository {
   async applyGamification(input: ApplyGamificationInput): Promise<UserProfile> {
     const profile = await this.addXp(input.totalXpDelta ?? 0);
     const dimension = input.dimension ?? 'discipline';
+    const shouldAppendAudit = Boolean(input.auditReason && input.auditSource);
+    const auditDimension: UserProfile['rewardHistory'][number]['dimension'] =
+      input.dimension ?? 'system';
+    const nextRewardHistory: UserProfile['rewardHistory'] = shouldAppendAudit
+      ? [
+          {
+            id: createId('reward'),
+            createdAt: input.auditCreatedAt ?? new Date().toISOString(),
+            source: input.auditSource!,
+            reason: input.auditReason!,
+            xpDelta: Math.max(0, input.totalXpDelta ?? 0),
+            coinsDelta: input.coinsDelta ?? 0,
+            dimension: auditDimension,
+          },
+          ...profile.rewardHistory,
+        ].slice(0, 120)
+      : profile.rewardHistory;
     return {
       ...profile,
       coins: Math.max(0, profile.coins + (input.coinsDelta ?? 0)),
@@ -146,6 +165,7 @@ export class SQLiteProfileRepository implements ProfileRepository {
       ownedAvatarItems: input.unlockAvatarItem
         ? Array.from(new Set([...profile.ownedAvatarItems, input.unlockAvatarItem]))
         : profile.ownedAvatarItems,
+      rewardHistory: nextRewardHistory,
     };
   }
 }

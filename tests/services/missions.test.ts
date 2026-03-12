@@ -24,6 +24,7 @@ describe('missions', () => {
         claimedMissionIds: [],
         unlockedAchievementIds: [],
         ownedAvatarItems: ['seedling'],
+        rewardHistory: [],
         avatarColor: '#0f766e',
         avatarItem: 'seedling',
       },

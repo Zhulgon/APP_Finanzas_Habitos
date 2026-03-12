@@ -24,6 +24,7 @@ describe('achievement specifications', () => {
         claimedMissionIds: [],
         unlockedAchievementIds: ['first_habit'],
         ownedAvatarItems: ['seedling'],
+        rewardHistory: [],
         avatarColor: '#0f766e',
         avatarItem: 'seedling',
       },
