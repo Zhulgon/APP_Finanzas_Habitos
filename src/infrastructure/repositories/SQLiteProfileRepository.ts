@@ -1,9 +1,10 @@
 import type {
+  ApplyGamificationInput,
   ProfileRepository,
   UpdateProfileInput,
 } from '../../domain/repositories/ProfileRepository';
 import type { UserProfile } from '../../domain/entities/Profile';
-import { levelFromXp } from '../../application/services/gamification';
+import { levelFromXp, rankFromLevel } from '../../application/services/gamification';
 import { getDatabase } from '../database/database';
 
 interface ProfileRow {
@@ -26,6 +27,19 @@ const mapProfile = (row: ProfileRow): UserProfile => ({
   currency: row.currency,
   xp: row.xp,
   level: row.level,
+  rank: rankFromLevel(row.level),
+  xpByDimension: {
+    discipline: 0,
+    finance: 0,
+    learning: 0,
+  },
+  coins: 0,
+  streakFreezes: 1,
+  lastFreezeGrantMonth: '',
+  missionDifficulty: 1,
+  claimedMissionIds: [],
+  unlockedAchievementIds: [],
+  ownedAvatarItems: ['seedling'],
   avatarColor: row.avatar_color,
   avatarItem: row.avatar_item,
 });
@@ -99,6 +113,39 @@ export class SQLiteProfileRepository implements ProfileRepository {
       ...profile,
       xp: nextXp,
       level: nextLevel,
+      rank: rankFromLevel(nextLevel),
+    };
+  }
+
+  async applyGamification(input: ApplyGamificationInput): Promise<UserProfile> {
+    const profile = await this.addXp(input.totalXpDelta ?? 0);
+    const dimension = input.dimension ?? 'discipline';
+    return {
+      ...profile,
+      coins: Math.max(0, profile.coins + (input.coinsDelta ?? 0)),
+      missionDifficulty: input.missionDifficulty ?? profile.missionDifficulty,
+      streakFreezes: Math.max(0, profile.streakFreezes + (input.streakFreezesDelta ?? 0)),
+      lastFreezeGrantMonth:
+        input.lastFreezeGrantMonth ?? profile.lastFreezeGrantMonth,
+      xpByDimension: {
+        ...profile.xpByDimension,
+        [dimension]:
+          profile.xpByDimension[dimension] + Math.max(0, input.dimensionXpDelta ?? 0),
+      },
+      claimedMissionIds: input.claimedMissionId
+        ? Array.from(new Set([...profile.claimedMissionIds, input.claimedMissionId]))
+        : profile.claimedMissionIds,
+      unlockedAchievementIds: input.unlockedAchievementId
+        ? Array.from(
+            new Set([
+              ...profile.unlockedAchievementIds,
+              input.unlockedAchievementId,
+            ]),
+          )
+        : profile.unlockedAchievementIds,
+      ownedAvatarItems: input.unlockAvatarItem
+        ? Array.from(new Set([...profile.ownedAvatarItems, input.unlockAvatarItem]))
+        : profile.ownedAvatarItems,
     };
   }
 }

@@ -1,11 +1,11 @@
 import type { LessonRepository } from '../../repositories/LessonRepository';
-import type { ProfileRepository } from '../../repositories/ProfileRepository';
-import { xpForAction } from '../../../application/services/gamification';
+import type { DomainEventBus } from '../../events/DomainEventBus';
 import { toIsoDate } from '../../../shared/utils/date';
+import { createId } from '../../../shared/utils/id';
 
 interface Deps {
   lessonRepository: LessonRepository;
-  profileRepository: ProfileRepository;
+  eventBus?: DomainEventBus;
 }
 
 export const completeLessonUseCase = async (
@@ -21,6 +21,15 @@ export const completeLessonUseCase = async (
     return false;
   }
 
-  await deps.profileRepository.addXp(xpForAction('lesson_completed'));
+  await deps.eventBus?.publish({
+    id: createId('evt_lesson_completed'),
+    type: 'lesson.completed',
+    occurredAt: new Date().toISOString(),
+    payload: {
+      lessonId,
+      completedAt: toIsoDate(new Date()),
+    },
+  });
+
   return true;
 };

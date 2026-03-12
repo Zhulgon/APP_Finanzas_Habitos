@@ -9,6 +9,11 @@ import { clamp, formatCurrency } from '../../shared/utils/formatters';
 import { ProgressBar } from '../components/ProgressBar';
 import { SectionCard } from '../components/SectionCard';
 
+const toDimensionProgress = (xp: number): number => {
+  const nextLevelWindow = 240;
+  return clamp(((xp % nextLevelWindow) / nextLevelWindow) * 100, 0, 100);
+};
+
 export const DashboardScreen = () => {
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   const profile = useAppStore((state) => state.profile);
@@ -16,6 +21,8 @@ export const DashboardScreen = () => {
   const financeSummary = useAppStore((state) => state.financeSummary);
   const insights = useAppStore((state) => state.insights);
   const achievements = useAppStore((state) => state.achievements);
+  const missions = useAppStore((state) => state.missions);
+  const telemetry = useAppStore((state) => state.telemetry);
 
   const habitsCompleted = habitStats.todayCompleted;
   const habitsTotal = habitStats.activeHabitsCount;
@@ -28,10 +35,22 @@ export const DashboardScreen = () => {
 
   const financialStatus =
     financeSummary.savingsRate >= 20
-      ? { label: 'Saludable', color: colors.success, helper: 'Mantienes una tasa de ahorro solida.' }
+      ? {
+          label: 'Saludable',
+          color: colors.success,
+          helper: 'Mantienes una tasa de ahorro solida.',
+        }
       : financeSummary.savingsRate >= 0
-        ? { label: 'Atencion', color: colors.warning, helper: 'Ajusta gastos variables esta semana.' }
-        : { label: 'Riesgo', color: colors.danger, helper: 'Tus gastos superan tus ingresos.' };
+        ? {
+            label: 'Atencion',
+            color: colors.warning,
+            helper: 'Ajusta gastos variables esta semana.',
+          }
+        : {
+            label: 'Riesgo',
+            color: colors.danger,
+            helper: 'Tus gastos superan tus ingresos.',
+          };
 
   const topInsight = insights[0];
 
@@ -51,18 +70,61 @@ export const DashboardScreen = () => {
         <View style={styles.heroStatsRow}>
           <View style={styles.heroStatItem}>
             <Text style={styles.heroStatValue}>Nivel {profile?.level ?? 1}</Text>
-            <Text style={styles.heroStatLabel}>Tu avance</Text>
+            <Text style={styles.heroStatLabel}>{profile?.rank || 'novato'}</Text>
           </View>
           <View style={styles.heroStatItem}>
             <Text style={styles.heroStatValue}>{profile?.xp ?? 0} XP</Text>
-            <Text style={styles.heroStatLabel}>Experiencia</Text>
+            <Text style={styles.heroStatLabel}>Experiencia total</Text>
           </View>
           <View style={styles.heroStatItem}>
-            <Text style={styles.heroStatValue}>{unlockedAchievements}</Text>
-            <Text style={styles.heroStatLabel}>Logros</Text>
+            <Text style={styles.heroStatValue}>{profile?.coins ?? 0}</Text>
+            <Text style={styles.heroStatLabel}>Monedas</Text>
           </View>
         </View>
       </View>
+
+      <SectionCard title="Misiones activas">
+        {missions.length === 0 ? (
+          <Text style={styles.missionHint}>Aun no hay misiones disponibles.</Text>
+        ) : (
+          missions.map((mission) => (
+            <View key={mission.id} style={styles.missionRow}>
+              <View style={styles.missionHeaderRow}>
+                <Text style={styles.missionTitle}>{mission.title}</Text>
+                <Text
+                  style={[
+                    styles.missionState,
+                    mission.claimed
+                      ? styles.missionClaimed
+                      : mission.completed
+                        ? styles.missionCompleted
+                        : styles.missionPending,
+                  ]}
+                >
+                  {mission.claimed ? 'Reclamada' : mission.completed ? 'Completa' : 'Activa'}
+                </Text>
+              </View>
+              <Text style={styles.missionBody}>{mission.description}</Text>
+              <Text style={styles.missionProgress}>Progreso: {mission.current}/{mission.target}</Text>
+            </View>
+          ))
+        )}
+      </SectionCard>
+
+      <SectionCard title="Progreso de habilidades">
+        <ProgressBar
+          label="Disciplina"
+          value={toDimensionProgress(profile?.xpByDimension.discipline ?? 0)}
+        />
+        <ProgressBar
+          label="Finanzas"
+          value={toDimensionProgress(profile?.xpByDimension.finance ?? 0)}
+        />
+        <ProgressBar
+          label="Aprendizaje"
+          value={toDimensionProgress(profile?.xpByDimension.learning ?? 0)}
+        />
+      </SectionCard>
 
       <SectionCard title="Prioridad de hoy">
         <View style={styles.priorityRow}>
@@ -112,6 +174,18 @@ export const DashboardScreen = () => {
         <Text style={styles.priorityHint}>{financialStatus.helper}</Text>
       </SectionCard>
 
+      <SectionCard title="Telemetria de balance">
+        <Text style={styles.missionHint}>
+          Misiones completadas: {telemetry.missionCompletionRate.toFixed(0)}%
+        </Text>
+        <Text style={styles.missionHint}>
+          Cumplimiento habitos: {telemetry.weeklyHabitRate.toFixed(0)}%
+        </Text>
+        <Text style={styles.missionHint}>
+          Riesgo de abandono: {telemetry.engagementRisk}
+        </Text>
+      </SectionCard>
+
       <SectionCard title="Acciones rapidas">
         <View style={styles.actionsRow}>
           <Pressable style={styles.actionCard} onPress={() => navigation.navigate('Habitos')}>
@@ -136,6 +210,9 @@ export const DashboardScreen = () => {
       </SectionCard>
 
       <SectionCard title="Logros destacados">
+        <Text style={styles.missionHint}>
+          {unlockedAchievements}/{achievements.length} desbloqueados
+        </Text>
         {achievements.slice(0, 3).map((achievement) => (
           <View key={achievement.id} style={styles.achievementRow}>
             <Text style={achievement.unlocked ? styles.dotOn : styles.dotOff}>
@@ -156,7 +233,9 @@ export const DashboardScreen = () => {
             <Text style={styles.insightBody}>{topInsight.body}</Text>
           </>
         ) : (
-          <Text style={styles.insightBody}>Aun no hay insights, registra actividad hoy para ver recomendaciones.</Text>
+          <Text style={styles.insightBody}>
+            Aun no hay insights, registra actividad hoy para ver recomendaciones.
+          </Text>
         )}
       </SectionCard>
     </ScreenContainer>
@@ -221,6 +300,50 @@ const styles = StyleSheet.create({
   heroStatLabel: {
     color: '#d5f3ee',
     fontSize: 11,
+  },
+  missionRow: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.sm,
+    gap: 4,
+  },
+  missionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  missionTitle: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  missionBody: {
+    color: colors.mutedText,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  missionProgress: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  missionState: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  missionCompleted: {
+    color: colors.success,
+  },
+  missionPending: {
+    color: colors.warning,
+  },
+  missionClaimed: {
+    color: colors.info,
+  },
+  missionHint: {
+    color: colors.mutedText,
+    fontSize: 12,
   },
   priorityRow: {
     flexDirection: 'row',

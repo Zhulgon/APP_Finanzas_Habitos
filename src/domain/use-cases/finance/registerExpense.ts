@@ -1,12 +1,12 @@
 import type { ExpenseCategory } from '../../entities/Finance';
 import type { FinanceRepository } from '../../repositories/FinanceRepository';
-import type { ProfileRepository } from '../../repositories/ProfileRepository';
-import { xpForAction } from '../../../application/services/gamification';
+import type { DomainEventBus } from '../../events/DomainEventBus';
 import { toIsoDate } from '../../../shared/utils/date';
+import { createId } from '../../../shared/utils/id';
 
 interface Deps {
   financeRepository: FinanceRepository;
-  profileRepository: ProfileRepository;
+  eventBus?: DomainEventBus;
 }
 
 export const registerExpenseUseCase = async (
@@ -20,13 +20,26 @@ export const registerExpenseUseCase = async (
     throw new Error('El gasto debe ser mayor a cero.');
   }
 
+  const recordedAt = toIsoDate(new Date());
+  const normalizedSubCategory = subCategory.trim() || 'General';
+
   await deps.financeRepository.addExpense({
     amount,
     category,
-    subCategory: subCategory.trim() || 'General',
+    subCategory: normalizedSubCategory,
     note: note?.trim(),
-    recordedAt: toIsoDate(new Date()),
+    recordedAt,
   });
 
-  await deps.profileRepository.addXp(xpForAction('expense_logged'));
+  await deps.eventBus?.publish({
+    id: createId('evt_expense_logged'),
+    type: 'finance.expense_logged',
+    occurredAt: new Date().toISOString(),
+    payload: {
+      amount,
+      category,
+      subCategory: normalizedSubCategory,
+      recordedAt,
+    },
+  });
 };

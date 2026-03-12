@@ -1,6 +1,7 @@
-import { levelFromXp } from '../../../application/services/gamification';
+import { levelFromXp, rankFromLevel } from '../../../application/services/gamification';
 import type { UserProfile } from '../../../domain/entities/Profile';
 import type {
+  ApplyGamificationInput,
   ProfileRepository,
   UpdateProfileInput,
 } from '../../../domain/repositories/ProfileRepository';
@@ -37,9 +38,61 @@ export class WebProfileRepository implements ProfileRepository {
           ...state.profile,
           xp: nextXp,
           level: levelFromXp(nextXp),
+          rank: rankFromLevel(levelFromXp(nextXp)),
         },
       };
     });
+    return nextState.profile;
+  }
+
+  async applyGamification(input: ApplyGamificationInput): Promise<UserProfile> {
+    const nextState = updateWebState((state) => {
+      const current = state.profile;
+      const dimension = input.dimension ?? 'discipline';
+      const totalXpDelta = Math.max(0, input.totalXpDelta ?? 0);
+      const dimensionXpDelta = Math.max(0, input.dimensionXpDelta ?? 0);
+      const coinsDelta = input.coinsDelta ?? 0;
+      const streakFreezesDelta = input.streakFreezesDelta ?? 0;
+      const nextXp = current.xp + totalXpDelta;
+      const nextLevel = levelFromXp(nextXp);
+
+      const claimedMissionIds = new Set(current.claimedMissionIds);
+      const unlockedAchievementIds = new Set(current.unlockedAchievementIds);
+      if (input.claimedMissionId) {
+        claimedMissionIds.add(input.claimedMissionId);
+      }
+      if (input.unlockedAchievementId) {
+        unlockedAchievementIds.add(input.unlockedAchievementId);
+      }
+      const ownedAvatarItems = new Set(current.ownedAvatarItems);
+      if (input.unlockAvatarItem) {
+        ownedAvatarItems.add(input.unlockAvatarItem);
+      }
+
+      return {
+        ...state,
+        profile: {
+          ...current,
+          xp: nextXp,
+          level: nextLevel,
+          rank: rankFromLevel(nextLevel),
+          coins: Math.max(0, current.coins + coinsDelta),
+          streakFreezes: Math.max(0, current.streakFreezes + streakFreezesDelta),
+          lastFreezeGrantMonth:
+            input.lastFreezeGrantMonth ?? current.lastFreezeGrantMonth,
+          missionDifficulty: input.missionDifficulty ?? current.missionDifficulty,
+          xpByDimension: {
+            ...current.xpByDimension,
+            [dimension]:
+              current.xpByDimension[dimension] + dimensionXpDelta,
+          },
+          claimedMissionIds: Array.from(claimedMissionIds),
+          unlockedAchievementIds: Array.from(unlockedAchievementIds),
+          ownedAvatarItems: Array.from(ownedAvatarItems),
+        },
+      };
+    });
+
     return nextState.profile;
   }
 }
