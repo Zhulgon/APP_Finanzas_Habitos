@@ -30,6 +30,12 @@ const sourceColor: Record<RewardHistorySource, string> = {
   system: colors.mutedText,
 };
 
+const riskLabel: Record<'low' | 'medium' | 'high', string> = {
+  low: 'Bajo',
+  medium: 'Medio',
+  high: 'Alto',
+};
+
 export const ProgressScreen = () => {
   const profile = useAppStore((state) => state.profile);
   const missions = useAppStore((state) => state.missions);
@@ -101,7 +107,7 @@ export const ProgressScreen = () => {
           Cumplimiento habitos: {telemetry.weeklyHabitRate.toFixed(0)}%
         </Text>
         <Text style={styles.metricLine}>
-          Riesgo de abandono: {telemetry.engagementRisk}
+          Riesgo de abandono: {riskLabel[telemetry.engagementRisk]}
         </Text>
       </SectionCard>
 
@@ -211,4 +217,3 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 });
-

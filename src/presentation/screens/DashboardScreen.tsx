@@ -14,6 +14,12 @@ const toDimensionProgress = (xp: number): number => {
   return clamp(((xp % nextLevelWindow) / nextLevelWindow) * 100, 0, 100);
 };
 
+const riskLabel: Record<'low' | 'medium' | 'high', string> = {
+  low: 'Bajo',
+  medium: 'Medio',
+  high: 'Alto',
+};
+
 export const DashboardScreen = () => {
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   const profile = useAppStore((state) => state.profile);
@@ -182,7 +188,7 @@ export const DashboardScreen = () => {
           Cumplimiento habitos: {telemetry.weeklyHabitRate.toFixed(0)}%
         </Text>
         <Text style={styles.missionHint}>
-          Riesgo de abandono: {telemetry.engagementRisk}
+          Riesgo de abandono: {riskLabel[telemetry.engagementRisk]}
         </Text>
       </SectionCard>
 

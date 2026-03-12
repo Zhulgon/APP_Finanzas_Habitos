@@ -247,42 +247,49 @@ export const FinanceScreen = () => {
       </SectionCard>
 
       <SectionCard title="Consumo del mes vs presupuesto">
-        {budgetProgress.map((entry) => {
-          const statusColor =
-            entry.status === 'healthy'
-              ? colors.success
-              : entry.status === 'warning'
-                ? colors.warning
-                : colors.danger;
-          const statusLabel =
-            entry.status === 'healthy'
-              ? 'Saludable'
-              : entry.status === 'warning'
-                ? 'Cerca del limite'
-                : 'Sobrepasado';
-          return (
-            <View key={`progress-${entry.category}`} style={styles.budgetRow}>
-              <View style={styles.budgetHeader}>
-                <Text style={styles.budgetCategory}>{entry.category}</Text>
-                <Text style={[styles.budgetStatus, { color: statusColor }]}>
-                  {statusLabel}
+        {budgetProgress.length === 0 ? (
+          <EmptyState
+            title="Aun no hay presupuesto por categoria"
+            body="Define montos en fijo, variable o servicios para activar alertas de consumo."
+          />
+        ) : (
+          budgetProgress.map((entry) => {
+            const statusColor =
+              entry.status === 'healthy'
+                ? colors.success
+                : entry.status === 'warning'
+                  ? colors.warning
+                  : colors.danger;
+            const statusLabel =
+              entry.status === 'healthy'
+                ? 'Saludable'
+                : entry.status === 'warning'
+                  ? 'Cerca del limite'
+                  : 'Sobrepasado';
+            return (
+              <View key={`progress-${entry.category}`} style={styles.budgetRow}>
+                <View style={styles.budgetHeader}>
+                  <Text style={styles.budgetCategory}>{entry.category}</Text>
+                  <Text style={[styles.budgetStatus, { color: statusColor }]}>
+                    {statusLabel}
+                  </Text>
+                </View>
+                <ProgressBar
+                  label={`${formatCurrency(entry.spent, currency)} / ${formatCurrency(
+                    entry.budget,
+                    currency,
+                  )}`}
+                  value={entry.usageRate}
+                />
+                <Text style={styles.budgetHelper}>
+                  {entry.remaining >= 0
+                    ? `Disponible: ${formatCurrency(entry.remaining, currency)}`
+                    : `Exceso: ${formatCurrency(Math.abs(entry.remaining), currency)}`}
                 </Text>
               </View>
-              <ProgressBar
-                label={`${formatCurrency(entry.spent, currency)} / ${formatCurrency(
-                  entry.budget,
-                  currency,
-                )}`}
-                value={entry.usageRate}
-              />
-              <Text style={styles.budgetHelper}>
-                {entry.remaining >= 0
-                  ? `Disponible: ${formatCurrency(entry.remaining, currency)}`
-                  : `Exceso: ${formatCurrency(Math.abs(entry.remaining), currency)}`}
-              </Text>
-            </View>
-          );
-        })}
+            );
+          })
+        )}
       </SectionCard>
 
       <SectionCard title="Ultimos gastos">
