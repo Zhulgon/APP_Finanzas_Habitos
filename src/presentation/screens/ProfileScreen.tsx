@@ -99,6 +99,7 @@ export const ProfileScreen = () => {
   const achievements = useAppStore((state) => state.achievements);
   const updateProfile = useAppStore((state) => state.updateProfile);
   const buyAvatarItem = useAppStore((state) => state.buyAvatarItem);
+  const updateAvatar = useAppStore((state) => state.updateAvatar);
   const useStreakFreeze = useAppStore((state) => state.useStreakFreeze);
   const exportBackup = useAppStore((state) => state.exportBackup);
   const importBackup = useAppStore((state) => state.importBackup);
@@ -195,11 +196,8 @@ export const ProfileScreen = () => {
   };
 
   const onUseStreakFreeze = async () => {
-    const ok = await useStreakFreeze();
-    showToast(
-      ok ? 'Comodin de racha usado.' : 'No tienes comodines disponibles.',
-      ok ? 'success' : 'error',
-    );
+    const result = await useStreakFreeze();
+    showToast(result.message, result.ok ? 'success' : 'error');
   };
 
   const onSelectAvatarItem = async (itemId: string, cost: number) => {
@@ -213,7 +211,16 @@ export const ProfileScreen = () => {
       showToast(`Item ${itemId} comprado.`, 'success');
     }
 
-    setAvatarItem(itemId);
+    try {
+      await updateAvatar(avatarColor, itemId);
+      setAvatarItem(itemId);
+      showToast(`Item ${itemId} equipado.`, 'success');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'No se pudo equipar el item.',
+        'error',
+      );
+    }
   };
 
   const onSaveProgress = async () => {
@@ -360,10 +367,21 @@ export const ProfileScreen = () => {
                 >
                   {item.id}
                 </Text>
-                <Text style={styles.itemPrice}>
-                  {profile?.ownedAvatarItems.includes(item.id)
-                    ? 'Comprado'
-                    : `${item.cost} monedas`}
+                <Text
+                  style={[
+                    styles.itemPrice,
+                    avatarItem === item.id
+                      ? styles.itemPriceEquipped
+                      : profile?.ownedAvatarItems.includes(item.id)
+                        ? styles.itemPriceOwned
+                        : styles.itemPriceLocked,
+                  ]}
+                >
+                  {avatarItem === item.id
+                    ? 'Equipado'
+                    : profile?.ownedAvatarItems.includes(item.id)
+                      ? 'Disponible'
+                      : `${item.cost} monedas`}
                 </Text>
               </Pressable>
             ))}
@@ -557,6 +575,17 @@ const styles = StyleSheet.create({
     color: colors.mutedText,
     fontSize: 11,
     marginTop: 2,
+  },
+  itemPriceEquipped: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  itemPriceOwned: {
+    color: colors.success,
+    fontWeight: '700',
+  },
+  itemPriceLocked: {
+    color: colors.warning,
   },
   timeInput: {
     minWidth: 90,

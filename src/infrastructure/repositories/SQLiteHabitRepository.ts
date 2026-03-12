@@ -141,4 +141,22 @@ export class SQLiteHabitRepository implements HabitRepository {
       streakDays,
     };
   }
+
+  async listCompletionDates(referenceDate: Date, lookbackDays: number): Promise<string[]> {
+    const db = await getDatabase();
+    const safeLookbackDays = Math.max(1, lookbackDays);
+    const lowerBound = toIsoDate(subDays(referenceDate, safeLookbackDays));
+
+    const completionDays = await db.getAllAsync<{ day: string }>(
+      `
+      SELECT DISTINCT date(completed_at) as day
+      FROM habit_logs
+      WHERE date(completed_at) >= date(?)
+      ORDER BY day DESC
+      `,
+      lowerBound,
+    );
+
+    return completionDays.map((row) => row.day);
+  }
 }

@@ -58,6 +58,7 @@ export const createHabitRepositoryMock = (
   createHabit: async () => {},
   logCompletion: async () => false,
   getStats: async () => emptyHabitStats,
+  listCompletionDates: async (): Promise<string[]> => [],
   ...overrides,
 });
 

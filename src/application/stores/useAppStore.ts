@@ -34,11 +34,12 @@ import {
 } from '../services/missions';
 import { buildAchievementsWithSpecifications } from '../services/achievementSpecifications';
 import { missionDifficultyFromRate } from '../services/gamification';
-import { toMonthKey } from '../../shared/utils/date';
+import { toIsoDate, toMonthKey } from '../../shared/utils/date';
 import {
   buildBalanceTelemetry,
   type BalanceTelemetry,
 } from '../services/telemetry';
+import { subDays } from 'date-fns';
 
 interface OnboardingInput {
   name: string;
@@ -83,7 +84,8 @@ interface AppState {
   importBackup: (serializedBackup: string) => Promise<void>;
   completeLesson: (lessonId: string) => Promise<boolean>;
   buyAvatarItem: (item: string, cost: number) => Promise<boolean>;
-  useStreakFreeze: () => Promise<boolean>;
+  updateAvatar: (avatarColor: string, avatarItem: string) => Promise<void>;
+  useStreakFreeze: () => Promise<{ ok: boolean; message: string }>;
   updateProfile: (input: {
     name: string;
     objective: string;
@@ -229,9 +231,9 @@ const applyProgressionRewards = async (snapshots: SnapshotResult): Promise<boole
     await repositories.profileRepository.applyGamification({
       unlockedAchievementId: achievementId,
       dimension: 'learning',
-      totalXpDelta: 18,
-      dimensionXpDelta: 18,
-      coinsDelta: 5,
+      totalXpDelta: 12,
+      dimensionXpDelta: 12,
+      coinsDelta: 3,
     });
     hasChanges = true;
   }
@@ -413,10 +415,71 @@ export const useAppStore = create<AppState>((set) => ({
     set({ ...snapshots });
     return true;
   },
+  async updateAvatar(avatarColor, avatarItem) {
+    const current = await repositories.profileRepository.getProfile();
+    await repositories.profileRepository.updateProfile({
+      name: current.name,
+      objective: current.objective,
+      monthlyIncome: current.monthlyIncome,
+      monthlySavingsGoal: current.monthlySavingsGoal,
+      currency: current.currency,
+      avatarColor,
+      avatarItem,
+    });
+
+    const snapshots = await refreshSnapshotsWithProgression();
+    set({ ...snapshots });
+  },
   async useStreakFreeze() {
     const profile = await repositories.profileRepository.getProfile();
     if (profile.streakFreezes <= 0) {
-      return false;
+      return {
+        ok: false,
+        message: 'No tienes comodines disponibles.',
+      };
+    }
+
+    const activeHabits = await repositories.habitRepository.listActiveHabits();
+    if (activeHabits.length === 0) {
+      return {
+        ok: false,
+        message: 'Necesitas al menos un habito activo para usar comodin.',
+      };
+    }
+
+    const referenceDate = new Date();
+    const completionDates = await repositories.habitRepository.listCompletionDates(
+      referenceDate,
+      14,
+    );
+    const completionSet = new Set(completionDates);
+
+    let missedDate: string | null = null;
+    for (let dayOffset = 1; dayOffset <= 7; dayOffset += 1) {
+      const dayIso = toIsoDate(subDays(referenceDate, dayOffset));
+      if (!completionSet.has(dayIso)) {
+        missedDate = dayIso;
+        break;
+      }
+    }
+
+    if (!missedDate) {
+      return {
+        ok: false,
+        message: 'No hay un dia perdido reciente para proteger.',
+      };
+    }
+
+    const applied = await repositories.habitRepository.logCompletion(
+      activeHabits[0].id,
+      missedDate,
+    );
+
+    if (!applied) {
+      return {
+        ok: false,
+        message: 'Ese dia ya estaba protegido.',
+      };
     }
 
     await repositories.profileRepository.applyGamification({
@@ -425,7 +488,10 @@ export const useAppStore = create<AppState>((set) => ({
 
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
-    return true;
+    return {
+      ok: true,
+      message: `Racha protegida para ${missedDate}.`,
+    };
   },
   async updateProfile(input) {
     await repositories.profileRepository.updateProfile({

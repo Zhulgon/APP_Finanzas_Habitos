@@ -64,8 +64,8 @@ export const buildMissions = (context: MissionBuildContext): Mission[] => {
       description: `Completa ${habitTarget} habito(s) hoy.`,
       current: context.habitStats.todayCompleted,
       target: habitTarget,
-      rewardXp: 24,
-      rewardCoins: 4,
+      rewardXp: 14,
+      rewardCoins: 3,
       rewardDimension: 'discipline',
       completed: context.habitStats.todayCompleted >= habitTarget,
       claimed: claimedSet.has(`daily_habits_${dailyKey}`),
@@ -77,8 +77,8 @@ export const buildMissions = (context: MissionBuildContext): Mission[] => {
       description: 'Mantener balance mensual en cero o positivo.',
       current: context.financeSummary.balance >= 0 ? 1 : 0,
       target: 1,
-      rewardXp: 16,
-      rewardCoins: 3,
+      rewardXp: 10,
+      rewardCoins: 2,
       rewardDimension: 'finance',
       completed: context.financeSummary.balance >= 0,
       claimed: claimedSet.has(`daily_finance_${dailyKey}`),
@@ -90,8 +90,8 @@ export const buildMissions = (context: MissionBuildContext): Mission[] => {
       description: 'Cumple 2 de 3 frentes: habitos, ahorro y aprendizaje.',
       current: weeklyPoints,
       target: 2,
-      rewardXp: 48,
-      rewardCoins: 8,
+      rewardXp: 28,
+      rewardCoins: 5,
       rewardDimension: 'learning',
       completed: weeklyPoints >= 2,
       claimed: claimedSet.has(`weekly_combo_${weeklyKey}`),
@@ -104,4 +104,3 @@ export const buildMissions = (context: MissionBuildContext): Mission[] => {
 export const findUnclaimedCompletedMissions = (missions: Mission[]): Mission[] => {
   return missions.filter((mission) => mission.completed && !mission.claimed);
 };
-

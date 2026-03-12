@@ -99,4 +99,18 @@ export class WebHabitRepository implements HabitRepository {
       streakDays,
     };
   }
+
+  async listCompletionDates(referenceDate: Date, lookbackDays: number): Promise<string[]> {
+    const safeLookbackDays = Math.max(1, lookbackDays);
+    const state = readWebState();
+    const lowerBound = toIsoDate(subDays(referenceDate, safeLookbackDays));
+
+    const uniqueDays = new Set(
+      state.habitLogs
+        .filter((log) => log.completedAt >= lowerBound)
+        .map((log) => log.completedAt),
+    );
+
+    return Array.from(uniqueDays).sort((a, b) => (a < b ? 1 : -1));
+  }
 }

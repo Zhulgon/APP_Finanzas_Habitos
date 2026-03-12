@@ -11,15 +11,15 @@ export type XpAction =
   | 'lesson_completed';
 
 const LEGACY_XP_RULES: Record<XpAction, number> = {
-  habit_completion: 10,
-  expense_logged: 5,
-  income_logged: 5,
-  lesson_completed: 15,
+  habit_completion: 9,
+  expense_logged: 4,
+  income_logged: 4,
+  lesson_completed: 12,
 };
 
 export const xpForAction = (action: XpAction): number => LEGACY_XP_RULES[action];
 
-const XP_PER_LEVEL = 120;
+const XP_PER_LEVEL = 160;
 
 export const levelFromXp = (xp: number): number => {
   return Math.floor(Math.max(0, xp) / XP_PER_LEVEL) + 1;
@@ -46,9 +46,9 @@ export interface GamificationReward {
 }
 
 const DIFFICULTY_MULTIPLIER: Record<1 | 2 | 3, number> = {
-  1: 0.9,
+  1: 0.85,
   2: 1,
-  3: 1.15,
+  3: 1.1,
 };
 
 const eventBaseRewards: {
@@ -60,26 +60,26 @@ const eventBaseRewards: {
 } = {
   'habit.completed': {
     dimension: 'discipline',
-    baseXp: 12,
+    baseXp: 9,
     baseCoins: 2,
     reason: 'Completar habito',
   },
   'finance.expense_logged': {
     dimension: 'finance',
-    baseXp: 6,
+    baseXp: 4,
     baseCoins: 1,
     reason: 'Registrar gasto',
   },
   'finance.income_logged': {
     dimension: 'finance',
-    baseXp: 5,
+    baseXp: 4,
     baseCoins: 1,
     reason: 'Registrar ingreso',
   },
   'lesson.completed': {
     dimension: 'learning',
-    baseXp: 16,
-    baseCoins: 3,
+    baseXp: 12,
+    baseCoins: 2,
     reason: 'Completar capsula',
   },
 };
@@ -102,10 +102,10 @@ export const buildGamificationReward = (
 export const missionDifficultyFromRate = (
   completionRatePercent: number,
 ): 1 | 2 | 3 => {
-  if (completionRatePercent >= 80) {
+  if (completionRatePercent >= 85) {
     return 3;
   }
-  if (completionRatePercent >= 45) {
+  if (completionRatePercent >= 55) {
     return 2;
   }
   return 1;
