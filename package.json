@@ -1,6 +1,6 @@
 {
   "name": "app_habitos_finanzas_gamificado",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",

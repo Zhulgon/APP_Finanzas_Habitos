@@ -77,4 +77,4 @@ Hacer la app mas util en uso real diario con foco en:
 - [x] `npx expo export --platform web` en verde.
 - [ ] QA manual de recordatorios.
 - [ ] QA de resumen/export semanal.
-- [ ] Release notes `v1.1.0`.
+- [x] Release notes `v1.1.0`.
