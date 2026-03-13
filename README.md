@@ -30,6 +30,8 @@ Aplicacion personal para gestionar habitos, finanzas y progreso gamificado.
   - academia financiera diaria con desbloqueo progresivo (1 capsula por dia)
   - ruta educativa por pilares (mentalidad, flujo, presupuesto, riesgo, inversion)
   - pulso USD/COP via API con fallback local seguro
+  - autenticacion base por correo (codigo local prototipo) y modo invitado
+  - cola de sincronizacion offline-first (pending/sync/flush) visible en Perfil
 
 ## Stack tecnico
 

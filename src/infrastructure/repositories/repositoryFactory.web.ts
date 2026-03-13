@@ -1,8 +1,10 @@
 import { WebBackupRepository } from './web/WebBackupRepository';
+import { WebAuthRepository } from './web/WebAuthRepository';
 import { WebFinanceRepository } from './web/WebFinanceRepository';
 import { WebHabitRepository } from './web/WebHabitRepository';
 import { WebLessonRepository } from './web/WebLessonRepository';
 import { WebProfileRepository } from './web/WebProfileRepository';
+import { WebSyncRepository } from './web/WebSyncRepository';
 import { WebWeeklyPlanRepository } from './web/WebWeeklyPlanRepository';
 import type { RepositoryBundle } from './repositoryFactory.types';
 
@@ -15,5 +17,7 @@ export const createRepositoryBundle = (): RepositoryBundle => {
     profileRepository: new WebProfileRepository(),
     weeklyPlanRepository: new WebWeeklyPlanRepository(),
     backupRepository: new WebBackupRepository(),
+    authRepository: new WebAuthRepository(),
+    syncRepository: new WebSyncRepository(),
   };
 };

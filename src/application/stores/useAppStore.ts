@@ -12,8 +12,10 @@ import type {
   HabitFrequency,
   HabitStats,
 } from '../../domain/entities/Habit';
+import type { AuthSession } from '../../domain/entities/Auth';
 import type { LessonWithStatus } from '../../domain/entities/Lesson';
 import type { UserProfile } from '../../domain/entities/Profile';
+import type { SyncSummary } from '../../domain/entities/Sync';
 import type { WeeklyPlanProgress } from '../../domain/entities/WeeklyPlan';
 import { createRepositoryBundle } from '../../infrastructure/repositories/repositoryFactory';
 import { createHabitUseCase } from '../../domain/use-cases/habits/createHabit';
@@ -24,6 +26,12 @@ import { registerExpenseUseCase } from '../../domain/use-cases/finance/registerE
 import { registerIncomeUseCase } from '../../domain/use-cases/finance/registerIncome';
 import { setMonthlyBudgetUseCase } from '../../domain/use-cases/finance/setMonthlyBudget';
 import { completeLessonUseCase } from '../../domain/use-cases/learning/completeLesson';
+import { requestEmailCodeUseCase } from '../../domain/use-cases/auth/requestEmailCode';
+import { verifyEmailCodeUseCase } from '../../domain/use-cases/auth/verifyEmailCode';
+import { signInAsGuestUseCase } from '../../domain/use-cases/auth/signInAsGuest';
+import { signOutUseCase } from '../../domain/use-cases/auth/signOut';
+import { enqueueSyncItemUseCase } from '../../domain/use-cases/sync/enqueueSyncItem';
+import { flushSyncQueueUseCase } from '../../domain/use-cases/sync/flushSyncQueue';
 import { getWeeklyPlanProgressUseCase } from '../../domain/use-cases/weekly-plan/getWeeklyPlanProgress';
 import { setWeeklyHabitTargetUseCase } from '../../domain/use-cases/weekly-plan/setWeeklyHabitTarget';
 import { setWeeklySavingsTargetUseCase } from '../../domain/use-cases/weekly-plan/setWeeklySavingsTarget';
@@ -83,7 +91,11 @@ interface OnboardingInput {
 
 interface AppState {
   isBootstrapping: boolean;
+  isAuthLoading: boolean;
   error?: string;
+  authSession: AuthSession | null;
+  authPendingEmail: string;
+  syncSummary: SyncSummary;
   profile: UserProfile | null;
   habits: Habit[];
   habitStats: HabitStats;
@@ -102,6 +114,13 @@ interface AppState {
   recentIncomes: IncomeRecord[];
   lessons: LessonWithStatus[];
   bootstrap: () => Promise<void>;
+  requestAuthCode: (
+    email: string,
+  ) => Promise<{ ok: boolean; message: string; devCode?: string }>;
+  verifyAuthCode: (email: string, code: string) => Promise<{ ok: boolean; message: string }>;
+  signInAsGuest: () => Promise<void>;
+  signOut: () => Promise<void>;
+  flushCloudSync: () => Promise<{ ok: boolean; message: string }>;
   finishOnboarding: (input: OnboardingInput) => Promise<void>;
   createHabit: (
     name: string,
@@ -192,6 +211,12 @@ const emptyLearningPath: LearningPathSnapshot = {
   pendingLessons: 0,
   availableToday: 0,
   completedToday: 0,
+};
+const emptySyncSummary: SyncSummary = {
+  pending: 0,
+  synced: 0,
+  failed: 0,
+  lastStatus: 'idle',
 };
 const emptyWeekly = emptyWeeklySummary();
 
@@ -443,8 +468,40 @@ const refreshSnapshotsWithProgression = async (): Promise<SnapshotResult> => {
   return snapshots;
 };
 
-export const useAppStore = create<AppState>((set, get) => ({
+export const useAppStore = create<AppState>((set, get) => {
+  const refreshSyncSummary = async (): Promise<SyncSummary> => {
+    const syncSummary = await repositories.syncRepository.getSummary();
+    set({ syncSummary });
+    return syncSummary;
+  };
+
+  const enqueueSync = async (
+    entity: string,
+    action: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> => {
+    try {
+      await enqueueSyncItemUseCase(repositories.syncRepository, {
+        entity,
+        action,
+        payload,
+      });
+      await refreshSyncSummary();
+    } catch (error) {
+      trackAppEvent('sync.enqueue.error', 'warn', {
+        entity,
+        action,
+        message: error instanceof Error ? error.message : 'Error en cola de sync.',
+      });
+    }
+  };
+
+  return {
   isBootstrapping: true,
+  isAuthLoading: false,
+  authSession: null,
+  authPendingEmail: '',
+  syncSummary: emptySyncSummary,
   profile: null,
   habits: [],
   habitStats: emptyHabitStats,
@@ -462,12 +519,107 @@ export const useAppStore = create<AppState>((set, get) => ({
   recentExpenses: [],
   recentIncomes: [],
   lessons: [],
+  async requestAuthCode(email) {
+    set({ isAuthLoading: true });
+    try {
+      const result = await requestEmailCodeUseCase(
+        repositories.authRepository,
+        email,
+      );
+      if (result.ok) {
+        set({ authPendingEmail: email.trim().toLowerCase() });
+        trackAppEvent('auth.code_requested', 'info', {
+          email: email.trim().toLowerCase(),
+        });
+      }
+      return result;
+    } finally {
+      set({ isAuthLoading: false });
+    }
+  },
+  async verifyAuthCode(email, code) {
+    set({ isAuthLoading: true });
+    try {
+      const result = await verifyEmailCodeUseCase(
+        repositories.authRepository,
+        email,
+        code,
+      );
+      if (result.ok) {
+        set({
+          authSession: result.session ?? null,
+          authPendingEmail: '',
+        });
+        await refreshSyncSummary();
+        trackAppEvent('auth.signed_in', 'info', {
+          provider: result.session?.provider ?? 'email_magic_code',
+        });
+      }
+
+      return {
+        ok: result.ok,
+        message: result.message,
+      };
+    } finally {
+      set({ isAuthLoading: false });
+    }
+  },
+  async signInAsGuest() {
+    set({ isAuthLoading: true });
+    try {
+      const session = await signInAsGuestUseCase(repositories.authRepository);
+      set({
+        authSession: session,
+        authPendingEmail: '',
+      });
+      await refreshSyncSummary();
+      trackAppEvent('auth.signed_in_guest', 'info');
+    } finally {
+      set({ isAuthLoading: false });
+    }
+  },
+  async signOut() {
+    await signOutUseCase(repositories.authRepository);
+    set({
+      authSession: null,
+      authPendingEmail: '',
+    });
+    trackAppEvent('auth.signed_out', 'info');
+  },
+  async flushCloudSync() {
+    const result = await flushSyncQueueUseCase(
+      repositories.syncRepository,
+      get().authSession,
+    );
+    await refreshSyncSummary();
+    trackAppEvent(
+      'sync.flush',
+      result.ok ? 'info' : 'warn',
+      {
+        processed: result.processed,
+        remaining: result.remaining,
+      },
+    );
+    return {
+      ok: result.ok,
+      message: result.message,
+    };
+  },
   async bootstrap() {
     set({ isBootstrapping: true, error: undefined });
     try {
       await repositories.initialize();
-      const snapshots = await refreshSnapshotsWithProgression();
-      set({ ...snapshots, isBootstrapping: false });
+      const [snapshots, authSession, syncSummary] = await Promise.all([
+        refreshSnapshotsWithProgression(),
+        repositories.authRepository.getSession(),
+        repositories.syncRepository.getSummary(),
+      ]);
+      set({
+        ...snapshots,
+        authSession,
+        syncSummary,
+        isBootstrapping: false,
+      });
       trackAppEvent('app.bootstrap.success', 'info');
     } catch (error) {
       trackAppEvent('app.bootstrap.error', 'error', {
@@ -507,6 +659,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    await enqueueSync('profile', 'onboarding_completed', {
+      initialHabits: input.initialHabits.length,
+      currency: input.currency,
+    });
     trackAppEvent('onboarding.completed', 'info', {
       initialHabits: input.initialHabits.length,
     });
@@ -519,6 +675,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    await enqueueSync('habit', 'created', {
+      name,
+      frequency,
+      category,
+    });
     trackAppEvent('habit.created', 'info', {
       category,
       frequency,
@@ -533,6 +694,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    await enqueueSync('habit', 'updated', {
+      habitId,
+      frequency,
+      category,
+    });
     return wasUpdated;
   },
   async archiveHabit(habitId) {
@@ -542,6 +708,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    await enqueueSync('habit', 'archived', {
+      habitId,
+      archived: wasArchived,
+    });
     trackAppEvent('habit.archived', 'info', {
       habitId,
       archived: wasArchived,
@@ -558,6 +728,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    await enqueueSync('habit', 'completed', {
+      habitId,
+      completed: wasCompleted,
+    });
     trackAppEvent('habit.completed', wasCompleted ? 'info' : 'warn', {
       habitId,
       completed: wasCompleted,
@@ -577,6 +751,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    await enqueueSync('finance', 'expense_added', {
+      amount,
+      category,
+      subCategory,
+      hasNote: Boolean(note),
+    });
     trackAppEvent('finance.expense_added', 'info', {
       amount,
       category,
@@ -594,6 +774,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    await enqueueSync('finance', 'income_added', {
+      amount,
+    });
     trackAppEvent('finance.income_added', 'info', {
       amount,
     });
@@ -607,6 +790,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    await enqueueSync('finance', 'budget_set', {
+      category,
+      amount,
+    });
   },
   async exportBackup() {
     trackAppEvent('backup.export.requested', 'info');
@@ -616,6 +803,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     await repositories.backupRepository.importBackup(serializedBackup);
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    await enqueueSync('backup', 'imported', {
+      bytes: serializedBackup.length,
+    });
     trackAppEvent('backup.import.completed', 'info', {
       bytes: serializedBackup.length,
     });
@@ -638,6 +828,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    await enqueueSync('lesson', 'completed', {
+      lessonId,
+      completed: wasCompleted,
+    });
     trackAppEvent('lesson.completed', wasCompleted ? 'info' : 'warn', {
       lessonId,
       completed: wasCompleted,
@@ -662,6 +856,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    await enqueueSync('avatar', 'item_purchased', {
+      item,
+      cost,
+    });
     return true;
   },
   async updateAvatar(avatarColor, avatarItem) {
@@ -678,6 +876,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    await enqueueSync('avatar', 'updated', {
+      avatarColor,
+      avatarItem,
+    });
   },
   async useStreakFreeze() {
     const profile = await repositories.profileRepository.getProfile();
@@ -739,6 +941,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    await enqueueSync('habit', 'streak_freeze_used', {
+      missedDate,
+    });
     return {
       ok: true,
       message: `Racha protegida para ${missedDate}.`,
@@ -752,6 +957,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    await enqueueSync('weekly_plan', 'habit_target_set', {
+      target,
+    });
     trackAppEvent('weekly_plan.habit_target_set', 'info', {
       target,
     });
@@ -764,6 +972,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    await enqueueSync('weekly_plan', 'savings_target_set', {
+      target,
+    });
     trackAppEvent('weekly_plan.savings_target_set', 'info', {
       target,
     });
@@ -774,5 +985,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    await enqueueSync('profile', 'updated', {
+      currency: input.currency,
+      hasObjective: Boolean(input.objective),
+    });
   },
-}));
+  };
+});

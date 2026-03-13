@@ -119,6 +119,63 @@ const backupDataSchema = z.object({
     incomeId: z.number().int().positive(),
     expenseId: z.number().int().positive(),
   }),
+  auth: z
+    .object({
+      session: z
+        .object({
+          userId: z.string(),
+          email: z.string(),
+          provider: z.enum(['email_magic_code', 'guest']),
+          signedInAt: z.string(),
+        })
+        .nullable()
+        .optional()
+        .default(null),
+      pendingEmail: z.string().optional().default(''),
+      challenge: z
+        .object({
+          email: z.string(),
+          code: z.string(),
+          expiresAt: z.string(),
+        })
+        .optional(),
+    })
+    .optional()
+    .default({
+      session: null,
+      pendingEmail: '',
+    }),
+  sync: z
+    .object({
+      queue: z
+        .array(
+          z.object({
+            id: z.string(),
+            entity: z.string(),
+            action: z.string(),
+            payload: z.record(z.string(), z.unknown()),
+            createdAt: z.string(),
+            updatedAt: z.string(),
+            attempts: z.number().int().nonnegative(),
+            status: z.enum(['pending', 'synced', 'failed']),
+          }),
+        )
+        .optional()
+        .default([]),
+      lastSyncedAt: z.string().optional().default(''),
+      lastStatus: z
+        .enum(['idle', 'running', 'success', 'error'])
+        .optional()
+        .default('idle'),
+      cloudEnabled: z.boolean().optional().default(true),
+    })
+    .optional()
+    .default({
+      queue: [],
+      lastSyncedAt: '',
+      lastStatus: 'idle',
+      cloudEnabled: true,
+    }),
 });
 
 const backupV1Schema = z.object({
@@ -166,7 +223,7 @@ export class WebBackupRepository implements BackupRepository {
     const payload = {
       version: 2 as const,
       exportedAt: new Date().toISOString(),
-      exportedByVersion: '1.2.0',
+      exportedByVersion: '1.3.0-dev',
       data: readWebState(),
     };
     return JSON.stringify(payload, null, 2);

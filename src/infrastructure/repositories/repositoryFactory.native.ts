@@ -4,7 +4,9 @@ import { SQLiteHabitRepository } from './SQLiteHabitRepository';
 import { SQLiteLessonRepository } from './SQLiteLessonRepository';
 import { SQLiteProfileRepository } from './SQLiteProfileRepository';
 import { SQLiteWeeklyPlanRepository } from './SQLiteWeeklyPlanRepository';
+import { NativeAuthRepository } from './native/NativeAuthRepository';
 import { NativeBackupRepository } from './native/NativeBackupRepository';
+import { NativeSyncRepository } from './native/NativeSyncRepository';
 import type { RepositoryBundle } from './repositoryFactory.types';
 
 export const createRepositoryBundle = (): RepositoryBundle => {
@@ -16,5 +18,7 @@ export const createRepositoryBundle = (): RepositoryBundle => {
     profileRepository: new SQLiteProfileRepository(),
     weeklyPlanRepository: new SQLiteWeeklyPlanRepository(),
     backupRepository: new NativeBackupRepository(),
+    authRepository: new NativeAuthRepository(),
+    syncRepository: new NativeSyncRepository(),
   };
 };

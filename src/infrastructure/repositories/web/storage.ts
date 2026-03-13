@@ -4,7 +4,9 @@ import type {
   IncomeRecord,
 } from '../../../domain/entities/Finance';
 import type { Habit } from '../../../domain/entities/Habit';
+import type { AuthChallenge, AuthSession } from '../../../domain/entities/Auth';
 import type { UserProfile } from '../../../domain/entities/Profile';
+import type { SyncQueueItem } from '../../../domain/entities/Sync';
 import type { WeeklyPlan } from '../../../domain/entities/WeeklyPlan';
 
 interface HabitLog {
@@ -28,6 +30,19 @@ interface BudgetRecord {
   amount: number;
 }
 
+export interface WebAuthState {
+  session: AuthSession | null;
+  pendingEmail: string;
+  challenge?: AuthChallenge;
+}
+
+export interface WebSyncState {
+  queue: SyncQueueItem[];
+  lastSyncedAt: string;
+  lastStatus: 'idle' | 'running' | 'success' | 'error';
+  cloudEnabled: boolean;
+}
+
 export interface WebState {
   habits: Habit[];
   habitLogs: HabitLog[];
@@ -37,6 +52,8 @@ export interface WebState {
   budgets: BudgetRecord[];
   lessonProgress: LessonProgress[];
   profile: UserProfile;
+  auth: WebAuthState;
+  sync: WebSyncState;
   counters: Counters;
 }
 
@@ -77,6 +94,16 @@ const defaultState = (): WebState => ({
   budgets: [],
   lessonProgress: [],
   profile: defaultProfile,
+  auth: {
+    session: null,
+    pendingEmail: '',
+  },
+  sync: {
+    queue: [],
+    lastSyncedAt: '',
+    lastStatus: 'idle',
+    cloudEnabled: true,
+  },
   counters: {
     incomeId: 1,
     expenseId: 1,
@@ -110,6 +137,15 @@ const readFromStorage = (): WebState | null => {
       counters: {
         ...defaultState().counters,
         ...(parsed.counters ?? {}),
+      },
+      auth: {
+        ...defaultState().auth,
+        ...(parsed.auth ?? {}),
+      },
+      sync: {
+        ...defaultState().sync,
+        ...(parsed.sync ?? {}),
+        queue: parsed.sync?.queue ?? [],
       },
       weeklyPlans: parsed.weeklyPlans ?? [],
       budgets: parsed.budgets ?? [],

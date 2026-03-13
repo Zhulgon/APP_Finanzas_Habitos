@@ -102,6 +102,10 @@ const readBackupFileFromWeb = async (): Promise<string | null> => {
 };
 
 export const ProfileScreen = () => {
+  const authSession = useAppStore((state) => state.authSession);
+  const syncSummary = useAppStore((state) => state.syncSummary);
+  const flushCloudSync = useAppStore((state) => state.flushCloudSync);
+  const signOut = useAppStore((state) => state.signOut);
   const profile = useAppStore((state) => state.profile);
   const achievements = useAppStore((state) => state.achievements);
   const updateProfile = useAppStore((state) => state.updateProfile);
@@ -316,6 +320,17 @@ export const ProfileScreen = () => {
     } finally {
       setIsBackupLoading(false);
     }
+  };
+
+  const onFlushSync = async () => {
+    const result = await flushCloudSync();
+    showToast(result.message, result.ok ? 'success' : 'info');
+    refreshAppEvents();
+  };
+
+  const onSignOut = async () => {
+    await signOut();
+    showToast('Sesion cerrada.', 'info');
   };
 
   return (
@@ -550,6 +565,34 @@ export const ProfileScreen = () => {
               disabled={isBackupLoading}
             >
               Restaurar progreso
+            </AppButton>
+          </View>
+        </View>
+      </SectionCard>
+
+      <SectionCard title="Sesion y sincronizacion">
+        <Text style={styles.statusBody}>
+          Sesion: {authSession ? `${authSession.email} (${authSession.provider})` : 'sin sesion'}
+        </Text>
+        <Text style={styles.statusBody}>
+          Cola sync: pendientes {syncSummary.pending}, sincronizados {syncSummary.synced}, fallidos{' '}
+          {syncSummary.failed}
+        </Text>
+        <Text style={styles.statusBody}>
+          Estado: {syncSummary.lastStatus}
+          {syncSummary.lastSyncedAt
+            ? ` | Ultima sync: ${syncSummary.lastSyncedAt.slice(0, 19).replace('T', ' ')}`
+            : ''}
+        </Text>
+        <View style={styles.row}>
+          <View style={styles.flex}>
+            <AppButton onPress={onFlushSync} variant="secondary">
+              Sincronizar ahora
+            </AppButton>
+          </View>
+          <View style={styles.flex}>
+            <AppButton onPress={onSignOut} variant="secondary">
+              Cerrar sesion
             </AppButton>
           </View>
         </View>
