@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useAppStore } from '../../application/stores/useAppStore';
 import { ScreenContainer } from '../components/ScreenContainer';
@@ -7,6 +8,12 @@ import { ProgressBar } from '../components/ProgressBar';
 import { colors, radius, spacing } from '../../shared/theme/tokens';
 import type { RewardHistorySource } from '../../domain/entities/Profile';
 import { formatCurrency } from '../../shared/utils/formatters';
+import { AppButton } from '../components/AppButton';
+import { useUiStore } from '../stores/useUiStore';
+import {
+  buildWeeklySummaryCsv,
+  downloadWeeklySummaryCsv,
+} from '../../application/services/weeklySummaryCsv';
 
 const toDimensionProgress = (xp: number): number => {
   const nextLevelWindow = 240;
@@ -43,6 +50,8 @@ export const ProgressScreen = () => {
   const achievements = useAppStore((state) => state.achievements);
   const telemetry = useAppStore((state) => state.telemetry);
   const weeklySummary = useAppStore((state) => state.weeklySummary);
+  const showToast = useUiStore((state) => state.showToast);
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
 
   const completedMissions = missions.filter((mission) => mission.completed).length;
   const claimedMissions = missions.filter((mission) => mission.claimed).length;
@@ -50,6 +59,25 @@ export const ProgressScreen = () => {
     (achievement) => achievement.unlocked,
   ).length;
   const rewardHistory = profile?.rewardHistory.slice(0, 14) ?? [];
+
+  const onExportWeeklyCsv = async () => {
+    setIsExportingCsv(true);
+    try {
+      const csvContent = buildWeeklySummaryCsv(
+        weeklySummary,
+        profile?.currency ?? 'COP',
+      );
+      await downloadWeeklySummaryCsv(csvContent);
+      showToast('Resumen semanal exportado en CSV.', 'success');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'No se pudo exportar el CSV.',
+        'error',
+      );
+    } finally {
+      setIsExportingCsv(false);
+    }
+  };
 
   return (
     <ScreenContainer>
@@ -136,6 +164,9 @@ export const ProgressScreen = () => {
         </Text>
         <Text style={styles.summaryHeadline}>{weeklySummary.headline}</Text>
         <Text style={styles.emptyText}>{weeklySummary.recommendation}</Text>
+        <AppButton onPress={onExportWeeklyCsv} loading={isExportingCsv}>
+          Exportar resumen CSV
+        </AppButton>
       </SectionCard>
 
       <SectionCard title="Timeline de recompensas">
