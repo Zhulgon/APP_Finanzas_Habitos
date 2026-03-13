@@ -63,12 +63,23 @@ const weeklyPlanStatusLabel: Record<
   achieved: 'Logrado',
 };
 
+const weeklyTrendLabel: Record<'improving' | 'stable' | 'declining', string> = {
+  improving: 'Mejorando',
+  stable: 'Estable',
+  declining: 'En retroceso',
+};
+
+const formatSigned = (value: number): string => {
+  return `${value > 0 ? '+' : ''}${value.toFixed(0)}`;
+};
+
 export const ProgressScreen = () => {
   const profile = useAppStore((state) => state.profile);
   const missions = useAppStore((state) => state.missions);
   const achievements = useAppStore((state) => state.achievements);
   const telemetry = useAppStore((state) => state.telemetry);
   const weeklyPlanProgress = useAppStore((state) => state.weeklyPlanProgress);
+  const weeklyComparison = useAppStore((state) => state.weeklyComparison);
   const weeklySummary = useAppStore((state) => state.weeklySummary);
   const setWeeklyHabitTarget = useAppStore((state) => state.setWeeklyHabitTarget);
   const setWeeklySavingsTarget = useAppStore((state) => state.setWeeklySavingsTarget);
@@ -265,6 +276,54 @@ export const ProgressScreen = () => {
         </AppButton>
       </SectionCard>
 
+      <SectionCard title="Comparativo semanal (v1.2)">
+        <Text style={styles.metricLine}>Tendencia: {weeklyTrendLabel[weeklyComparison.trend]}</Text>
+        <Text style={styles.summaryHeadline}>{weeklyComparison.headline}</Text>
+        <Text style={styles.emptyText}>{weeklyComparison.recommendation}</Text>
+        <View style={styles.grid}>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricValue}>
+              {weeklyComparison.current.completedHabits}
+            </Text>
+            <Text style={styles.metricLabel}>Habitos semana actual</Text>
+            <Text style={styles.deltaText}>
+              Delta: {formatSigned(weeklyComparison.delta.completedHabits)}
+            </Text>
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricValue}>
+              {formatCurrency(
+                weeklyComparison.current.balance,
+                profile?.currency ?? 'COP',
+              )}
+            </Text>
+            <Text style={styles.metricLabel}>Balance semana actual</Text>
+            <Text style={styles.deltaText}>
+              Delta: {formatSigned(weeklyComparison.delta.balance)}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.grid}>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricValue}>{weeklyComparison.current.xpEarned}</Text>
+            <Text style={styles.metricLabel}>XP semana actual</Text>
+            <Text style={styles.deltaText}>
+              Delta: {formatSigned(weeklyComparison.delta.xpEarned)}
+            </Text>
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricValue}>{weeklyComparison.current.coinsNet}</Text>
+            <Text style={styles.metricLabel}>Monedas netas</Text>
+            <Text style={styles.deltaText}>
+              Delta: {formatSigned(weeklyComparison.delta.coinsNet)}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.emptyText}>
+          Semana anterior: {weeklyComparison.previous.weekKey || '-'}
+        </Text>
+      </SectionCard>
+
       <SectionCard title="Resumen semanal">
         <Text style={styles.metricLine}>Periodo: {weeklySummary.periodLabel}</Text>
         <Text style={styles.metricLine}>
@@ -389,6 +448,11 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 13,
     fontWeight: '800',
+  },
+  deltaText: {
+    color: colors.mutedText,
+    fontSize: 11,
+    fontWeight: '700',
   },
   historyRow: {
     borderTopWidth: 1,

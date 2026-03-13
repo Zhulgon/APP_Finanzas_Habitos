@@ -102,3 +102,4 @@ docs/
 - Base v1.1 cerrada.
 - Sprint propuesto siguiente: `v1.2.0` en [docs/sprint-v1.2.0-plan.md](docs/sprint-v1.2.0-plan.md)
 - Avance actual v1.2: base de `Plan semanal` (metas y progreso) integrada en `Progreso`.
+- Avance actual v1.2: comparativo semana actual vs anterior ya visible en `Progreso`.
