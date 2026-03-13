@@ -26,6 +26,7 @@ export const FinanceScreen = () => {
   const financeSummary = useAppStore((state) => state.financeSummary);
   const budgetProgress = useAppStore((state) => state.budgetProgress);
   const recentExpenses = useAppStore((state) => state.recentExpenses);
+  const recentIncomes = useAppStore((state) => state.recentIncomes);
   const addIncome = useAppStore((state) => state.addIncome);
   const addExpense = useAppStore((state) => state.addExpense);
   const setMonthlyBudget = useAppStore((state) => state.setMonthlyBudget);
@@ -314,6 +315,29 @@ export const FinanceScreen = () => {
           ))
         )}
       </SectionCard>
+
+      <SectionCard title="Ultimos ingresos">
+        {recentIncomes.length === 0 ? (
+          <EmptyState
+            title="Aun no hay ingresos registrados"
+            body="Registra tu primer ingreso para tener trazabilidad mensual."
+          />
+        ) : (
+          recentIncomes.map((item) => (
+            <View key={`income-${item.id}`} style={styles.expenseRow}>
+              <View>
+                <Text style={styles.expenseName}>
+                  {item.type === 'salary' ? 'Ingreso principal' : 'Ingreso extra'}
+                </Text>
+                <Text style={styles.expenseMeta}>{item.recordedAt}</Text>
+              </View>
+              <Text style={styles.incomeAmount}>
+                {formatCurrency(item.amount, currency)}
+              </Text>
+            </View>
+          ))
+        )}
+      </SectionCard>
     </ScreenContainer>
   );
 };
@@ -417,6 +441,10 @@ const styles = StyleSheet.create({
   },
   expenseAmount: {
     color: colors.text,
+    fontWeight: '700',
+  },
+  incomeAmount: {
+    color: colors.success,
     fontWeight: '700',
   },
 });

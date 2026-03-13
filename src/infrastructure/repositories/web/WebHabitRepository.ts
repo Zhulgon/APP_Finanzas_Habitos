@@ -32,6 +32,33 @@ export class WebHabitRepository implements HabitRepository {
     }));
   }
 
+  async archiveHabit(habitId: string): Promise<boolean> {
+    let wasArchived = false;
+    updateWebState((state) => {
+      const nextHabits = state.habits.map((habit) => {
+        if (habit.id !== habitId || !habit.isActive) {
+          return habit;
+        }
+        wasArchived = true;
+        return {
+          ...habit,
+          isActive: false,
+        };
+      });
+
+      if (!wasArchived) {
+        return state;
+      }
+
+      return {
+        ...state,
+        habits: nextHabits,
+      };
+    });
+
+    return wasArchived;
+  }
+
   async logCompletion(habitId: string, completedAt: string): Promise<boolean> {
     let inserted = false;
     updateWebState((state) => {

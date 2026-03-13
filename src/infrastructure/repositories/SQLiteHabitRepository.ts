@@ -58,6 +58,21 @@ export class SQLiteHabitRepository implements HabitRepository {
     );
   }
 
+  async archiveHabit(habitId: string): Promise<boolean> {
+    const db = await getDatabase();
+    const result = await db.runAsync(
+      `
+      UPDATE habits
+      SET is_active = 0
+      WHERE id = ?
+        AND is_active = 1
+      `,
+      habitId,
+    );
+
+    return result.changes > 0;
+  }
+
   async logCompletion(habitId: string, completedAt: string): Promise<boolean> {
     const db = await getDatabase();
     const result = await db.runAsync(

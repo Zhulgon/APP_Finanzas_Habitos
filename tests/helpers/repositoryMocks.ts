@@ -57,6 +57,7 @@ export const createHabitRepositoryMock = (
 ): HabitRepository => ({
   listActiveHabits: async (): Promise<Habit[]> => [],
   createHabit: async () => {},
+  archiveHabit: async () => false,
   logCompletion: async () => false,
   getStats: async () => emptyHabitStats,
   listCompletionDates: async (): Promise<string[]> => [],

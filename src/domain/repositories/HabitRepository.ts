@@ -17,6 +17,7 @@ export interface CreateHabitInput {
 export interface HabitRepository {
   listActiveHabits(): Promise<Habit[]>;
   createHabit(input: CreateHabitInput): Promise<void>;
+  archiveHabit(habitId: string): Promise<boolean>;
   logCompletion(habitId: string, completedAt: string): Promise<boolean>;
   getStats(referenceDate: Date): Promise<HabitStats>;
   listCompletionDates(referenceDate: Date, lookbackDays: number): Promise<string[]>;

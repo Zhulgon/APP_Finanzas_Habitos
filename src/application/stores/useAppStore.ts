@@ -3,6 +3,7 @@ import type {
   BudgetProgress,
   ExpenseCategory,
   ExpenseRecord,
+  IncomeRecord,
   MonthlyFinanceSummary,
 } from '../../domain/entities/Finance';
 import type {
@@ -15,6 +16,7 @@ import type { LessonWithStatus } from '../../domain/entities/Lesson';
 import type { UserProfile } from '../../domain/entities/Profile';
 import { createRepositoryBundle } from '../../infrastructure/repositories/repositoryFactory';
 import { createHabitUseCase } from '../../domain/use-cases/habits/createHabit';
+import { archiveHabitUseCase } from '../../domain/use-cases/habits/archiveHabit';
 import { completeHabitUseCase } from '../../domain/use-cases/habits/completeHabit';
 import { registerExpenseUseCase } from '../../domain/use-cases/finance/registerExpense';
 import { registerIncomeUseCase } from '../../domain/use-cases/finance/registerIncome';
@@ -63,6 +65,7 @@ interface AppState {
   missions: Mission[];
   telemetry: BalanceTelemetry;
   recentExpenses: ExpenseRecord[];
+  recentIncomes: IncomeRecord[];
   lessons: LessonWithStatus[];
   bootstrap: () => Promise<void>;
   finishOnboarding: (input: OnboardingInput) => Promise<void>;
@@ -71,6 +74,7 @@ interface AppState {
     frequency: HabitFrequency,
     category: HabitCategory,
   ) => Promise<void>;
+  archiveHabit: (habitId: string) => Promise<boolean>;
   completeHabit: (habitId: string) => Promise<boolean>;
   addExpense: (
     amount: number,
@@ -138,6 +142,7 @@ interface SnapshotResult {
   telemetry: BalanceTelemetry;
   newlyUnlockedAchievementIds: string[];
   recentExpenses: ExpenseRecord[];
+  recentIncomes: IncomeRecord[];
   lessons: LessonWithStatus[];
 }
 
@@ -149,6 +154,7 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
     financeSummary,
     budgetProgress,
     recentExpenses,
+    recentIncomes,
     lessons,
   ] = await Promise.all([
     repositories.profileRepository.getProfile(),
@@ -157,6 +163,7 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
     repositories.financeRepository.getMonthlySummary(new Date()),
     repositories.financeRepository.getBudgetProgress(new Date()),
     repositories.financeRepository.listRecentExpenses(8),
+    repositories.financeRepository.listRecentIncomes(5),
     repositories.lessonRepository.listLessons(),
   ]);
 
@@ -200,6 +207,7 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
     }),
     newlyUnlockedAchievementIds: achievementResult.newlyUnlockedIds,
     recentExpenses,
+    recentIncomes,
     lessons,
   };
 };
@@ -285,6 +293,7 @@ export const useAppStore = create<AppState>((set) => ({
   missions: emptyMissions,
   telemetry: emptyTelemetry,
   recentExpenses: [],
+  recentIncomes: [],
   lessons: [],
   async bootstrap() {
     set({ isBootstrapping: true, error: undefined });
@@ -335,6 +344,15 @@ export const useAppStore = create<AppState>((set) => ({
     });
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+  },
+  async archiveHabit(habitId) {
+    const wasArchived = await archiveHabitUseCase(
+      repositories.habitRepository,
+      habitId,
+    );
+    const snapshots = await refreshSnapshotsWithProgression();
+    set({ ...snapshots });
+    return wasArchived;
   },
   async completeHabit(habitId) {
     const wasCompleted = await completeHabitUseCase(

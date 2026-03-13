@@ -17,6 +17,7 @@ const categories: HabitCategory[] = ['health', 'productivity', 'finance'];
 export const HabitsScreen = () => {
   const habits = useAppStore((state) => state.habits);
   const createHabit = useAppStore((state) => state.createHabit);
+  const archiveHabit = useAppStore((state) => state.archiveHabit);
   const completeHabit = useAppStore((state) => state.completeHabit);
   const showToast = useUiStore((state) => state.showToast);
   const [name, setName] = useState('');
@@ -60,6 +61,14 @@ export const HabitsScreen = () => {
       return;
     }
     showToast('Ya habias marcado este habito hoy.', 'info');
+  };
+
+  const onArchiveHabit = async (habitId: string) => {
+    const wasArchived = await archiveHabit(habitId);
+    showToast(
+      wasArchived ? 'Habito archivado.' : 'No se pudo archivar el habito.',
+      wasArchived ? 'success' : 'error',
+    );
   };
 
   return (
@@ -146,6 +155,14 @@ export const HabitsScreen = () => {
               >
                 <Text style={styles.doneText}>Hecho</Text>
               </Pressable>
+              <Pressable
+                style={styles.archiveButton}
+                onPress={() => {
+                  void onArchiveHabit(habit.id);
+                }}
+              >
+                <Text style={styles.archiveText}>Archivar</Text>
+              </Pressable>
             </View>
           ))
         )}
@@ -203,8 +220,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.md,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'center',
+    gap: spacing.sm,
   },
   itemText: {
     flex: 1,
@@ -228,6 +246,18 @@ const styles = StyleSheet.create({
   },
   doneText: {
     color: colors.primary,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  archiveButton: {
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+  },
+  archiveText: {
+    color: colors.mutedText,
     fontWeight: '700',
     fontSize: 12,
   },
