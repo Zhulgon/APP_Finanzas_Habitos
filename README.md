@@ -91,10 +91,13 @@ docs/
   software-playbook.md
   release-checklist-v1.md
   release-checklist-v1.1.md
+  release-checklist-v1.2.md
   release-notes-v1.1.0.md
   sprint-v1.1.0-plan.md
+  sprint-v1.2.0-plan.md
 ```
 
 ## Roadmap inmediato
 
-- Base v1.1 cerrada. Siguiente iteracion sugerida: `v1.2.0`.
+- Base v1.1 cerrada.
+- Sprint propuesto siguiente: `v1.2.0` en [docs/sprint-v1.2.0-plan.md](docs/sprint-v1.2.0-plan.md)
