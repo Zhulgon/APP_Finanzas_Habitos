@@ -61,6 +61,10 @@ import {
   buildRecommendationsV2,
   type RecommendationV2,
 } from '../services/recommendationEngineV2';
+import {
+  buildLearningPath,
+  type LearningPathSnapshot,
+} from '../services/learningPath';
 import { trackAppEvent } from '../services/observability';
 import {
   buildWeeklyComparison,
@@ -92,6 +96,7 @@ interface AppState {
   weeklyPlanProgress: WeeklyPlanProgress;
   weeklyComparison: WeeklyComparison;
   recommendationsV2: RecommendationV2[];
+  learningPath: LearningPathSnapshot;
   weeklySummary: WeeklySummary;
   recentExpenses: ExpenseRecord[];
   recentIncomes: IncomeRecord[];
@@ -180,6 +185,14 @@ const emptyWeeklyPlanProgress: WeeklyPlanProgress = {
 };
 const emptyWeeklyComparisonState: WeeklyComparison = emptyWeeklyComparison();
 const emptyRecommendations: RecommendationV2[] = [];
+const emptyLearningPath: LearningPathSnapshot = {
+  lessons: [],
+  totalLessons: 0,
+  completedLessons: 0,
+  pendingLessons: 0,
+  availableToday: 0,
+  completedToday: 0,
+};
 const emptyWeekly = emptyWeeklySummary();
 
 interface SnapshotResult {
@@ -195,6 +208,7 @@ interface SnapshotResult {
   weeklyPlanProgress: WeeklyPlanProgress;
   weeklyComparison: WeeklyComparison;
   recommendationsV2: RecommendationV2[];
+  learningPath: LearningPathSnapshot;
   weeklySummary: WeeklySummary;
   newlyUnlockedAchievementIds: string[];
   recentExpenses: ExpenseRecord[];
@@ -218,7 +232,7 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
     budgetProgress,
     recentExpenses,
     recentIncomes,
-    lessons,
+    lessonCatalog,
     completionDates,
     weekIncomes,
     weekExpenses,
@@ -271,7 +285,7 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
     habitStats,
     financeSummary,
     budgetProgress,
-    lessons,
+    lessons: lessonCatalog,
     activeHabitsCount: habits.length,
   });
 
@@ -279,8 +293,12 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
     profile,
     habitStats,
     financeSummary,
-    lessons,
+    lessons: lessonCatalog,
     activeHabitsCount: habits.length,
+  });
+  const learningPath = buildLearningPath({
+    lessons: lessonCatalog,
+    referenceDate,
   });
 
   const previousBalance =
@@ -315,7 +333,7 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
       habitStats,
       financeSummary,
       budgetProgress,
-      lessons,
+      lessons: learningPath.lessons,
       activeHabitsCount: habits.length,
     }),
     achievements: achievementResult.badges,
@@ -335,23 +353,24 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
       recentFinanceMovementToday:
         recentExpenses.some((item) => item.recordedAt === toIsoDate(referenceDate)) ||
         recentIncomes.some((item) => item.recordedAt === toIsoDate(referenceDate)),
-      lessons,
+      lessons: learningPath.lessons,
       referenceDate,
     }),
+    learningPath,
     weeklySummary: buildWeeklySummary({
       referenceDate,
       habitStats,
       completionDates,
       incomes: weekIncomes,
       expenses: weekExpenses,
-      lessons,
+      lessons: learningPath.lessons,
       missions,
       rewardHistory: profile.rewardHistory,
     }),
     newlyUnlockedAchievementIds: achievementResult.newlyUnlockedIds,
     recentExpenses,
     recentIncomes,
-    lessons,
+    lessons: learningPath.lessons,
   };
 };
 
@@ -424,7 +443,7 @@ const refreshSnapshotsWithProgression = async (): Promise<SnapshotResult> => {
   return snapshots;
 };
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   isBootstrapping: true,
   profile: null,
   habits: [],
@@ -438,6 +457,7 @@ export const useAppStore = create<AppState>((set) => ({
   weeklyPlanProgress: emptyWeeklyPlanProgress,
   weeklyComparison: emptyWeeklyComparisonState,
   recommendationsV2: emptyRecommendations,
+  learningPath: emptyLearningPath,
   weeklySummary: emptyWeekly,
   recentExpenses: [],
   recentIncomes: [],
@@ -601,6 +621,14 @@ export const useAppStore = create<AppState>((set) => ({
     });
   },
   async completeLesson(lessonId) {
+    const lesson = get().lessons.find((item) => item.id === lessonId);
+    if (!lesson || lesson.completed || !lesson.availableToday) {
+      trackAppEvent('lesson.complete_blocked', 'warn', {
+        lessonId,
+      });
+      return false;
+    }
+
     const wasCompleted = await completeLessonUseCase(
       {
         lessonRepository: repositories.lessonRepository,

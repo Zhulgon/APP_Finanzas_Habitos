@@ -26,6 +26,10 @@ Aplicacion personal para gestionar habitos, finanzas y progreso gamificado.
   - recomendaciones v2 priorizadas por impacto
   - registro rapido en Home (habito, ingreso, gasto)
   - backup `v2` compatible con backup `v1`
+- Avances v1.3 en ejecucion:
+  - academia financiera diaria con desbloqueo progresivo (1 capsula por dia)
+  - ruta educativa por pilares (mentalidad, flujo, presupuesto, riesgo, inversion)
+  - pulso USD/COP via API con fallback local seguro
 
 ## Stack tecnico
 
@@ -102,6 +106,7 @@ src/
 docs/
   privacy-local-data.md
   release-checklist-v1-final.md
+  v1.3-commercial-sprint-plan.md
   software-playbook.md
   release-checklist-v1.md
   release-checklist-v1.1.md
@@ -115,4 +120,4 @@ docs/
 ## Roadmap inmediato
 
 - Base v1.2 cerrada.
-- Siguiente iteracion sugerida: `v1.3.0`.
+- v1.3 en ejecucion por sprints (ver `docs/v1.3-commercial-sprint-plan.md`).

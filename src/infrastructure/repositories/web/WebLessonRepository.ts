@@ -17,7 +17,7 @@ export class WebLessonRepository implements LessonRepository {
         completed: Boolean(completedAt),
         completedAt,
       };
-    });
+    }).sort((a, b) => (a.dayOrder ?? 999) - (b.dayOrder ?? 999));
   }
 
   async markLessonCompleted(lessonId: string, completedAt: string): Promise<boolean> {
