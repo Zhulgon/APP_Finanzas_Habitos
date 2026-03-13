@@ -169,6 +169,32 @@ export class SQLiteFinanceRepository implements FinanceRepository {
     }));
   }
 
+  async listExpensesByDateRange(
+    dateFrom: string,
+    dateTo: string,
+  ): Promise<ExpenseRecord[]> {
+    const db = await getDatabase();
+    const rows = await db.getAllAsync<ExpenseRow>(
+      `
+      SELECT id, amount, category, sub_category, note, recorded_at
+      FROM expenses
+      WHERE recorded_at >= ? AND recorded_at <= ?
+      ORDER BY recorded_at DESC, id DESC
+      `,
+      dateFrom,
+      dateTo,
+    );
+
+    return rows.map((row) => ({
+      id: row.id,
+      amount: row.amount,
+      category: row.category,
+      subCategory: row.sub_category,
+      note: row.note ?? undefined,
+      recordedAt: row.recorded_at,
+    }));
+  }
+
   async listRecentIncomes(limit: number): Promise<IncomeRecord[]> {
     const db = await getDatabase();
     const rows = await db.getAllAsync<IncomeRow>(
@@ -179,6 +205,30 @@ export class SQLiteFinanceRepository implements FinanceRepository {
       LIMIT ?
       `,
       limit,
+    );
+
+    return rows.map((row) => ({
+      id: row.id,
+      amount: row.amount,
+      type: row.type,
+      recordedAt: row.recorded_at,
+    }));
+  }
+
+  async listIncomesByDateRange(
+    dateFrom: string,
+    dateTo: string,
+  ): Promise<IncomeRecord[]> {
+    const db = await getDatabase();
+    const rows = await db.getAllAsync<IncomeRow>(
+      `
+      SELECT id, amount, type, recorded_at
+      FROM incomes
+      WHERE recorded_at >= ? AND recorded_at <= ?
+      ORDER BY recorded_at DESC, id DESC
+      `,
+      dateFrom,
+      dateTo,
     );
 
     return rows.map((row) => ({

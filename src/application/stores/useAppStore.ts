@@ -43,6 +43,11 @@ import {
   type BalanceTelemetry,
 } from '../services/telemetry';
 import { subDays } from 'date-fns';
+import {
+  buildWeeklySummary,
+  emptyWeeklySummary,
+  type WeeklySummary,
+} from '../services/weeklySummary';
 
 interface OnboardingInput {
   name: string;
@@ -65,6 +70,7 @@ interface AppState {
   achievements: AchievementBadge[];
   missions: Mission[];
   telemetry: BalanceTelemetry;
+  weeklySummary: WeeklySummary;
   recentExpenses: ExpenseRecord[];
   recentIncomes: IncomeRecord[];
   lessons: LessonWithStatus[];
@@ -136,6 +142,7 @@ const emptyTelemetry: BalanceTelemetry = {
   savingsRate: 0,
   engagementRisk: 'high',
 };
+const emptyWeekly = emptyWeeklySummary();
 
 interface SnapshotResult {
   profile: UserProfile;
@@ -147,6 +154,7 @@ interface SnapshotResult {
   achievements: AchievementBadge[];
   missions: Mission[];
   telemetry: BalanceTelemetry;
+  weeklySummary: WeeklySummary;
   newlyUnlockedAchievementIds: string[];
   recentExpenses: ExpenseRecord[];
   recentIncomes: IncomeRecord[];
@@ -154,6 +162,10 @@ interface SnapshotResult {
 }
 
 const refreshSnapshots = async (): Promise<SnapshotResult> => {
+  const referenceDate = new Date();
+  const weekStart = toIsoDate(subDays(referenceDate, 6));
+  const weekEnd = toIsoDate(referenceDate);
+
   const [
     profile,
     habits,
@@ -163,15 +175,21 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
     recentExpenses,
     recentIncomes,
     lessons,
+    completionDates,
+    weekIncomes,
+    weekExpenses,
   ] = await Promise.all([
     repositories.profileRepository.getProfile(),
     repositories.habitRepository.listActiveHabits(),
-    repositories.habitRepository.getStats(new Date()),
-    repositories.financeRepository.getMonthlySummary(new Date()),
-    repositories.financeRepository.getBudgetProgress(new Date()),
+    repositories.habitRepository.getStats(referenceDate),
+    repositories.financeRepository.getMonthlySummary(referenceDate),
+    repositories.financeRepository.getBudgetProgress(referenceDate),
     repositories.financeRepository.listRecentExpenses(8),
     repositories.financeRepository.listRecentIncomes(5),
     repositories.lessonRepository.listLessons(),
+    repositories.habitRepository.listCompletionDates(referenceDate, 7),
+    repositories.financeRepository.listIncomesByDateRange(weekStart, weekEnd),
+    repositories.financeRepository.listExpensesByDateRange(weekStart, weekEnd),
   ]);
 
   const achievementResult = buildAchievementsWithSpecifications({
@@ -211,6 +229,16 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
       missions,
       habitStats,
       financeSummary,
+    }),
+    weeklySummary: buildWeeklySummary({
+      referenceDate,
+      habitStats,
+      completionDates,
+      incomes: weekIncomes,
+      expenses: weekExpenses,
+      lessons,
+      missions,
+      rewardHistory: profile.rewardHistory,
     }),
     newlyUnlockedAchievementIds: achievementResult.newlyUnlockedIds,
     recentExpenses,
@@ -299,6 +327,7 @@ export const useAppStore = create<AppState>((set) => ({
   achievements: emptyAchievements,
   missions: emptyMissions,
   telemetry: emptyTelemetry,
+  weeklySummary: emptyWeekly,
   recentExpenses: [],
   recentIncomes: [],
   lessons: [],

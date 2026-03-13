@@ -32,5 +32,7 @@ export interface FinanceRepository {
   getBudgetProgress(referenceDate: Date): Promise<BudgetProgress[]>;
   listRecentExpenses(limit: number): Promise<ExpenseRecord[]>;
   listRecentIncomes(limit: number): Promise<IncomeRecord[]>;
+  listExpensesByDateRange(dateFrom: string, dateTo: string): Promise<ExpenseRecord[]>;
+  listIncomesByDateRange(dateFrom: string, dateTo: string): Promise<IncomeRecord[]>;
   getMonthlySummary(referenceDate: Date): Promise<MonthlyFinanceSummary>;
 }

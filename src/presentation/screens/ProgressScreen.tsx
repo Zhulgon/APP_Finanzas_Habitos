@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useAppStore } from '../../application/stores/useAppStore';
 import { ScreenContainer } from '../components/ScreenContainer';
@@ -6,6 +7,17 @@ import { SectionCard } from '../components/SectionCard';
 import { ProgressBar } from '../components/ProgressBar';
 import { colors, radius, spacing } from '../../shared/theme/tokens';
 import type { RewardHistorySource } from '../../domain/entities/Profile';
+import { formatCurrency } from '../../shared/utils/formatters';
+import { AppButton } from '../components/AppButton';
+import { useUiStore } from '../stores/useUiStore';
+import {
+  buildWeeklySummaryCsv,
+  downloadWeeklySummaryCsv,
+} from '../../application/services/weeklySummaryCsv';
+import {
+  buildWeeklySummaryShareText,
+  copyTextToClipboard,
+} from '../../application/services/weeklySummaryShare';
 
 const toDimensionProgress = (xp: number): number => {
   const nextLevelWindow = 240;
@@ -41,6 +53,10 @@ export const ProgressScreen = () => {
   const missions = useAppStore((state) => state.missions);
   const achievements = useAppStore((state) => state.achievements);
   const telemetry = useAppStore((state) => state.telemetry);
+  const weeklySummary = useAppStore((state) => state.weeklySummary);
+  const showToast = useUiStore((state) => state.showToast);
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
+  const [isCopyingSummary, setIsCopyingSummary] = useState(false);
 
   const completedMissions = missions.filter((mission) => mission.completed).length;
   const claimedMissions = missions.filter((mission) => mission.claimed).length;
@@ -48,6 +64,44 @@ export const ProgressScreen = () => {
     (achievement) => achievement.unlocked,
   ).length;
   const rewardHistory = profile?.rewardHistory.slice(0, 14) ?? [];
+
+  const onExportWeeklyCsv = async () => {
+    setIsExportingCsv(true);
+    try {
+      const csvContent = buildWeeklySummaryCsv(
+        weeklySummary,
+        profile?.currency ?? 'COP',
+      );
+      await downloadWeeklySummaryCsv(csvContent);
+      showToast('Resumen semanal exportado en CSV.', 'success');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'No se pudo exportar el CSV.',
+        'error',
+      );
+    } finally {
+      setIsExportingCsv(false);
+    }
+  };
+
+  const onCopyWeeklySummary = async () => {
+    setIsCopyingSummary(true);
+    try {
+      const text = buildWeeklySummaryShareText(
+        weeklySummary,
+        profile?.currency ?? 'COP',
+      );
+      await copyTextToClipboard(text);
+      showToast('Resumen semanal copiado.', 'success');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'No se pudo copiar el resumen.',
+        'error',
+      );
+    } finally {
+      setIsCopyingSummary(false);
+    }
+  };
 
   return (
     <ScreenContainer>
@@ -109,6 +163,41 @@ export const ProgressScreen = () => {
         <Text style={styles.metricLine}>
           Riesgo de abandono: {riskLabel[telemetry.engagementRisk]}
         </Text>
+      </SectionCard>
+
+      <SectionCard title="Resumen semanal">
+        <Text style={styles.metricLine}>Periodo: {weeklySummary.periodLabel}</Text>
+        <Text style={styles.metricLine}>
+          Dias activos: {weeklySummary.activeDays}/7
+        </Text>
+        <Text style={styles.metricLine}>
+          Habitos: {weeklySummary.habitCompletionRate.toFixed(0)}%
+        </Text>
+        <Text style={styles.metricLine}>
+          Ingresos: {formatCurrency(weeklySummary.incomesTotal, profile?.currency ?? 'COP')}
+        </Text>
+        <Text style={styles.metricLine}>
+          Gastos: {formatCurrency(weeklySummary.expensesTotal, profile?.currency ?? 'COP')}
+        </Text>
+        <Text style={styles.metricLine}>
+          Balance: {formatCurrency(weeklySummary.balance, profile?.currency ?? 'COP')}
+        </Text>
+        <Text style={styles.metricLine}>
+          XP ganada: {weeklySummary.xpEarned} | Monedas +{weeklySummary.coinsEarned} / -
+          {weeklySummary.coinsSpent}
+        </Text>
+        <Text style={styles.summaryHeadline}>{weeklySummary.headline}</Text>
+        <Text style={styles.emptyText}>{weeklySummary.recommendation}</Text>
+        <AppButton
+          onPress={onCopyWeeklySummary}
+          variant="secondary"
+          loading={isCopyingSummary}
+        >
+          Copiar resumen
+        </AppButton>
+        <AppButton onPress={onExportWeeklyCsv} loading={isExportingCsv}>
+          Exportar resumen CSV
+        </AppButton>
       </SectionCard>
 
       <SectionCard title="Timeline de recompensas">
@@ -186,6 +275,11 @@ const styles = StyleSheet.create({
     color: colors.mutedText,
     fontSize: 12,
     lineHeight: 18,
+  },
+  summaryHeadline: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
   },
   historyRow: {
     borderTopWidth: 1,

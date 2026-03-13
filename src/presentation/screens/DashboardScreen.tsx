@@ -8,6 +8,8 @@ import { colors, radius, spacing } from '../../shared/theme/tokens';
 import { clamp, formatCurrency } from '../../shared/utils/formatters';
 import { ProgressBar } from '../components/ProgressBar';
 import { SectionCard } from '../components/SectionCard';
+import { AppButton } from '../components/AppButton';
+import { toIsoDate } from '../../shared/utils/date';
 
 const toDimensionProgress = (xp: number): number => {
   const nextLevelWindow = 240;
@@ -29,6 +31,10 @@ export const DashboardScreen = () => {
   const achievements = useAppStore((state) => state.achievements);
   const missions = useAppStore((state) => state.missions);
   const telemetry = useAppStore((state) => state.telemetry);
+  const weeklySummary = useAppStore((state) => state.weeklySummary);
+  const recentExpenses = useAppStore((state) => state.recentExpenses);
+  const recentIncomes = useAppStore((state) => state.recentIncomes);
+  const lessons = useAppStore((state) => state.lessons);
 
   const habitsCompleted = habitStats.todayCompleted;
   const habitsTotal = habitStats.activeHabitsCount;
@@ -38,6 +44,22 @@ export const DashboardScreen = () => {
   const savingsGoalRate =
     savingsGoal <= 0 ? 0 : clamp((financeSummary.balance / savingsGoal) * 100, 0, 100);
   const unlockedAchievements = achievements.filter((achievement) => achievement.unlocked).length;
+  const todayIso = toIsoDate(new Date());
+  const hasFinanceMovementToday =
+    recentExpenses.some((item) => item.recordedAt === todayIso) ||
+    recentIncomes.some((item) => item.recordedAt === todayIso);
+  const completedLessonToday = lessons.some(
+    (lesson) => lesson.completedAt === todayIso,
+  );
+  const nextAction:
+    | { label: string; target: keyof MainTabParamList }
+    | undefined = habitsPending > 0
+    ? { label: 'Completar habitos de hoy', target: 'Habitos' }
+    : !hasFinanceMovementToday
+      ? { label: 'Registrar movimiento financiero', target: 'Finanzas' }
+      : !completedLessonToday
+        ? { label: 'Completar capsula educativa', target: 'Aprender' }
+        : { label: 'Revisar progreso del dia', target: 'Progreso' };
 
   const financialStatus =
     financeSummary.savingsRate >= 20
@@ -143,6 +165,56 @@ export const DashboardScreen = () => {
             ? `Te faltan ${habitsPending} habitos por completar hoy.`
             : 'Excelente, hoy completaste todos tus habitos.'}
         </Text>
+      </SectionCard>
+
+      <SectionCard title="Plan de hoy">
+        <View style={styles.dailyTaskRow}>
+          <Text style={styles.dailyTaskState}>{habitsPending > 0 ? '[ ]' : '[OK]'}</Text>
+          <Text style={styles.dailyTaskText}>
+            Habitos del dia ({habitsCompleted}/{habitsTotal})
+          </Text>
+        </View>
+        <View style={styles.dailyTaskRow}>
+          <Text style={styles.dailyTaskState}>{hasFinanceMovementToday ? '[OK]' : '[ ]'}</Text>
+          <Text style={styles.dailyTaskText}>Movimiento financiero registrado hoy</Text>
+        </View>
+        <View style={styles.dailyTaskRow}>
+          <Text style={styles.dailyTaskState}>{completedLessonToday ? '[OK]' : '[ ]'}</Text>
+          <Text style={styles.dailyTaskText}>Capsula de aprendizaje completada hoy</Text>
+        </View>
+        {nextAction ? (
+          <AppButton onPress={() => navigation.navigate(nextAction.target)}>
+            {nextAction.label}
+          </AppButton>
+        ) : null}
+      </SectionCard>
+
+      <SectionCard title="Resumen semanal automatico">
+        <Text style={styles.weeklyPeriod}>{weeklySummary.periodLabel}</Text>
+        <View style={styles.weeklyGrid}>
+          <View style={styles.weeklyMetricCard}>
+            <Text style={styles.weeklyMetricValue}>{weeklySummary.activeDays}/7</Text>
+            <Text style={styles.weeklyMetricLabel}>Dias activos</Text>
+          </View>
+          <View style={styles.weeklyMetricCard}>
+            <Text style={styles.weeklyMetricValue}>
+              {weeklySummary.habitCompletionRate.toFixed(0)}%
+            </Text>
+            <Text style={styles.weeklyMetricLabel}>Cumplimiento</Text>
+          </View>
+          <View style={styles.weeklyMetricCard}>
+            <Text style={styles.weeklyMetricValue}>
+              {formatCurrency(weeklySummary.balance, profile?.currency ?? 'COP')}
+            </Text>
+            <Text style={styles.weeklyMetricLabel}>Balance semanal</Text>
+          </View>
+          <View style={styles.weeklyMetricCard}>
+            <Text style={styles.weeklyMetricValue}>{weeklySummary.xpEarned}</Text>
+            <Text style={styles.weeklyMetricLabel}>XP ganada</Text>
+          </View>
+        </View>
+        <Text style={styles.weeklyHeadline}>{weeklySummary.headline}</Text>
+        <Text style={styles.priorityHint}>{weeklySummary.recommendation}</Text>
       </SectionCard>
 
       <SectionCard title="Panel financiero rapido">
@@ -370,6 +442,59 @@ const styles = StyleSheet.create({
     color: colors.mutedText,
     fontSize: 12,
     lineHeight: 18,
+  },
+  dailyTaskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.sm,
+  },
+  dailyTaskState: {
+    color: colors.text,
+    fontSize: 12,
+    width: 36,
+    fontWeight: '700',
+  },
+  dailyTaskText: {
+    flex: 1,
+    color: colors.mutedText,
+    fontSize: 12,
+  },
+  weeklyPeriod: {
+    color: colors.mutedText,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  weeklyGrid: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  weeklyMetricCard: {
+    flexGrow: 1,
+    minWidth: 120,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    padding: spacing.sm,
+    backgroundColor: '#f9fcfb',
+    gap: 2,
+  },
+  weeklyMetricValue: {
+    color: colors.text,
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  weeklyMetricLabel: {
+    color: colors.mutedText,
+    fontSize: 11,
+  },
+  weeklyHeadline: {
+    color: colors.text,
+    fontWeight: '800',
+    fontSize: 13,
   },
   moneyRow: {
     flexDirection: 'row',
