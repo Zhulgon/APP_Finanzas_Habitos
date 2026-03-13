@@ -30,4 +30,5 @@ export interface HabitRepository {
   logCompletion(habitId: string, completedAt: string): Promise<boolean>;
   getStats(referenceDate: Date): Promise<HabitStats>;
   listCompletionDates(referenceDate: Date, lookbackDays: number): Promise<string[]>;
+  countCompletionsByDateRange(dateFrom: string, dateTo: string): Promise<number>;
 }

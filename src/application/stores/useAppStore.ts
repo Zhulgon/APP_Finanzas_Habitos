@@ -14,6 +14,7 @@ import type {
 } from '../../domain/entities/Habit';
 import type { LessonWithStatus } from '../../domain/entities/Lesson';
 import type { UserProfile } from '../../domain/entities/Profile';
+import type { WeeklyPlanProgress } from '../../domain/entities/WeeklyPlan';
 import { createRepositoryBundle } from '../../infrastructure/repositories/repositoryFactory';
 import { createHabitUseCase } from '../../domain/use-cases/habits/createHabit';
 import { archiveHabitUseCase } from '../../domain/use-cases/habits/archiveHabit';
@@ -23,6 +24,9 @@ import { registerExpenseUseCase } from '../../domain/use-cases/finance/registerE
 import { registerIncomeUseCase } from '../../domain/use-cases/finance/registerIncome';
 import { setMonthlyBudgetUseCase } from '../../domain/use-cases/finance/setMonthlyBudget';
 import { completeLessonUseCase } from '../../domain/use-cases/learning/completeLesson';
+import { getWeeklyPlanProgressUseCase } from '../../domain/use-cases/weekly-plan/getWeeklyPlanProgress';
+import { setWeeklyHabitTargetUseCase } from '../../domain/use-cases/weekly-plan/setWeeklyHabitTarget';
+import { setWeeklySavingsTargetUseCase } from '../../domain/use-cases/weekly-plan/setWeeklySavingsTarget';
 import {
   buildProgressInsights,
   type AchievementBadge,
@@ -37,7 +41,12 @@ import {
 } from '../services/missions';
 import { buildAchievementsWithSpecifications } from '../services/achievementSpecifications';
 import { missionDifficultyFromRate } from '../services/gamification';
-import { toIsoDate, toMonthKey } from '../../shared/utils/date';
+import {
+  toIsoDate,
+  toMonthKey,
+  toWeekDateRange,
+  toWeekKey,
+} from '../../shared/utils/date';
 import {
   buildBalanceTelemetry,
   type BalanceTelemetry,
@@ -48,6 +57,15 @@ import {
   emptyWeeklySummary,
   type WeeklySummary,
 } from '../services/weeklySummary';
+import {
+  buildRecommendationsV2,
+  type RecommendationV2,
+} from '../services/recommendationEngineV2';
+import {
+  buildWeeklyComparison,
+  emptyWeeklyComparison,
+  type WeeklyComparison,
+} from '../services/weeklyComparison';
 
 interface OnboardingInput {
   name: string;
@@ -70,6 +88,9 @@ interface AppState {
   achievements: AchievementBadge[];
   missions: Mission[];
   telemetry: BalanceTelemetry;
+  weeklyPlanProgress: WeeklyPlanProgress;
+  weeklyComparison: WeeklyComparison;
+  recommendationsV2: RecommendationV2[];
   weeklySummary: WeeklySummary;
   recentExpenses: ExpenseRecord[];
   recentIncomes: IncomeRecord[];
@@ -103,6 +124,8 @@ interface AppState {
   buyAvatarItem: (item: string, cost: number) => Promise<boolean>;
   updateAvatar: (avatarColor: string, avatarItem: string) => Promise<void>;
   useStreakFreeze: () => Promise<{ ok: boolean; message: string }>;
+  setWeeklyHabitTarget: (target: number) => Promise<void>;
+  setWeeklySavingsTarget: (target: number) => Promise<void>;
   updateProfile: (input: {
     name: string;
     objective: string;
@@ -142,6 +165,20 @@ const emptyTelemetry: BalanceTelemetry = {
   savingsRate: 0,
   engagementRisk: 'high',
 };
+const emptyWeeklyPlanProgress: WeeklyPlanProgress = {
+  weekKey: '',
+  dateFrom: '',
+  dateTo: '',
+  habitTarget: 0,
+  completedHabits: 0,
+  habitProgressRate: 0,
+  savingsTarget: 0,
+  currentSavings: 0,
+  savingsProgressRate: 0,
+  status: 'unplanned',
+};
+const emptyWeeklyComparisonState: WeeklyComparison = emptyWeeklyComparison();
+const emptyRecommendations: RecommendationV2[] = [];
 const emptyWeekly = emptyWeeklySummary();
 
 interface SnapshotResult {
@@ -154,6 +191,9 @@ interface SnapshotResult {
   achievements: AchievementBadge[];
   missions: Mission[];
   telemetry: BalanceTelemetry;
+  weeklyPlanProgress: WeeklyPlanProgress;
+  weeklyComparison: WeeklyComparison;
+  recommendationsV2: RecommendationV2[];
   weeklySummary: WeeklySummary;
   newlyUnlockedAchievementIds: string[];
   recentExpenses: ExpenseRecord[];
@@ -163,8 +203,11 @@ interface SnapshotResult {
 
 const refreshSnapshots = async (): Promise<SnapshotResult> => {
   const referenceDate = new Date();
-  const weekStart = toIsoDate(subDays(referenceDate, 6));
-  const weekEnd = toIsoDate(referenceDate);
+  const rollingWeekStart = toIsoDate(subDays(referenceDate, 6));
+  const rollingWeekEnd = toIsoDate(referenceDate);
+  const currentWeekRange = toWeekDateRange(referenceDate);
+  const previousReferenceDate = subDays(referenceDate, 7);
+  const previousWeekRange = toWeekDateRange(previousReferenceDate);
 
   const [
     profile,
@@ -178,6 +221,10 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
     completionDates,
     weekIncomes,
     weekExpenses,
+    weeklyPlanProgress,
+    previousWeekCompletions,
+    previousWeekIncomes,
+    previousWeekExpenses,
   ] = await Promise.all([
     repositories.profileRepository.getProfile(),
     repositories.habitRepository.listActiveHabits(),
@@ -188,8 +235,34 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
     repositories.financeRepository.listRecentIncomes(5),
     repositories.lessonRepository.listLessons(),
     repositories.habitRepository.listCompletionDates(referenceDate, 7),
-    repositories.financeRepository.listIncomesByDateRange(weekStart, weekEnd),
-    repositories.financeRepository.listExpensesByDateRange(weekStart, weekEnd),
+    repositories.financeRepository.listIncomesByDateRange(
+      rollingWeekStart,
+      rollingWeekEnd,
+    ),
+    repositories.financeRepository.listExpensesByDateRange(
+      rollingWeekStart,
+      rollingWeekEnd,
+    ),
+    getWeeklyPlanProgressUseCase(
+      {
+        weeklyPlanRepository: repositories.weeklyPlanRepository,
+        habitRepository: repositories.habitRepository,
+        financeRepository: repositories.financeRepository,
+      },
+      referenceDate,
+    ),
+    repositories.habitRepository.countCompletionsByDateRange(
+      previousWeekRange.dateFrom,
+      previousWeekRange.dateTo,
+    ),
+    repositories.financeRepository.listIncomesByDateRange(
+      previousWeekRange.dateFrom,
+      previousWeekRange.dateTo,
+    ),
+    repositories.financeRepository.listExpensesByDateRange(
+      previousWeekRange.dateFrom,
+      previousWeekRange.dateTo,
+    ),
   ]);
 
   const achievementResult = buildAchievementsWithSpecifications({
@@ -207,6 +280,27 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
     financeSummary,
     lessons,
     activeHabitsCount: habits.length,
+  });
+
+  const previousBalance =
+    previousWeekIncomes.reduce((acc, row) => acc + row.amount, 0) -
+    previousWeekExpenses.reduce((acc, row) => acc + row.amount, 0);
+  const weeklyComparison = buildWeeklyComparison({
+    current: {
+      weekKey: weeklyPlanProgress.weekKey || toWeekKey(referenceDate),
+      dateFrom: currentWeekRange.dateFrom,
+      dateTo: currentWeekRange.dateTo,
+      completedHabits: weeklyPlanProgress.completedHabits,
+      balance: weeklyPlanProgress.currentSavings,
+    },
+    previous: {
+      weekKey: toWeekKey(previousReferenceDate),
+      dateFrom: previousWeekRange.dateFrom,
+      dateTo: previousWeekRange.dateTo,
+      completedHabits: previousWeekCompletions,
+      balance: previousBalance,
+    },
+    rewardHistory: profile.rewardHistory,
   });
 
   return {
@@ -229,6 +323,19 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
       missions,
       habitStats,
       financeSummary,
+    }),
+    weeklyPlanProgress,
+    weeklyComparison,
+    recommendationsV2: buildRecommendationsV2({
+      habitStats,
+      financeSummary,
+      weeklyPlanProgress,
+      weeklyComparison,
+      recentFinanceMovementToday:
+        recentExpenses.some((item) => item.recordedAt === toIsoDate(referenceDate)) ||
+        recentIncomes.some((item) => item.recordedAt === toIsoDate(referenceDate)),
+      lessons,
+      referenceDate,
     }),
     weeklySummary: buildWeeklySummary({
       referenceDate,
@@ -327,6 +434,9 @@ export const useAppStore = create<AppState>((set) => ({
   achievements: emptyAchievements,
   missions: emptyMissions,
   telemetry: emptyTelemetry,
+  weeklyPlanProgress: emptyWeeklyPlanProgress,
+  weeklyComparison: emptyWeeklyComparisonState,
+  recommendationsV2: emptyRecommendations,
   weeklySummary: emptyWeekly,
   recentExpenses: [],
   recentIncomes: [],
@@ -567,6 +677,24 @@ export const useAppStore = create<AppState>((set) => ({
       ok: true,
       message: `Racha protegida para ${missedDate}.`,
     };
+  },
+  async setWeeklyHabitTarget(target) {
+    await setWeeklyHabitTargetUseCase(
+      repositories.weeklyPlanRepository,
+      target,
+      new Date(),
+    );
+    const snapshots = await refreshSnapshotsWithProgression();
+    set({ ...snapshots });
+  },
+  async setWeeklySavingsTarget(target) {
+    await setWeeklySavingsTargetUseCase(
+      repositories.weeklyPlanRepository,
+      target,
+      new Date(),
+    );
+    const snapshots = await refreshSnapshotsWithProgression();
+    set({ ...snapshots });
   },
   async updateProfile(input) {
     await repositories.profileRepository.updateProfile({

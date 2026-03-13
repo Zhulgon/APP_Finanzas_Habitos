@@ -3,6 +3,7 @@ import { WebFinanceRepository } from './web/WebFinanceRepository';
 import { WebHabitRepository } from './web/WebHabitRepository';
 import { WebLessonRepository } from './web/WebLessonRepository';
 import { WebProfileRepository } from './web/WebProfileRepository';
+import { WebWeeklyPlanRepository } from './web/WebWeeklyPlanRepository';
 import type { RepositoryBundle } from './repositoryFactory.types';
 
 export const createRepositoryBundle = (): RepositoryBundle => {
@@ -12,6 +13,7 @@ export const createRepositoryBundle = (): RepositoryBundle => {
     financeRepository: new WebFinanceRepository(),
     lessonRepository: new WebLessonRepository(),
     profileRepository: new WebProfileRepository(),
+    weeklyPlanRepository: new WebWeeklyPlanRepository(),
     backupRepository: new WebBackupRepository(),
   };
 };

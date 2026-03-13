@@ -197,4 +197,19 @@ export class SQLiteHabitRepository implements HabitRepository {
 
     return completionDays.map((row) => row.day);
   }
+
+  async countCompletionsByDateRange(dateFrom: string, dateTo: string): Promise<number> {
+    const db = await getDatabase();
+    const row = await db.getFirstAsync<{ total: number }>(
+      `
+      SELECT COUNT(*) as total
+      FROM habit_logs
+      WHERE date(completed_at) BETWEEN date(?) AND date(?)
+      `,
+      dateFrom,
+      dateTo,
+    );
+
+    return row?.total ?? 0;
+  }
 }

@@ -5,6 +5,7 @@ import type {
 } from '../../../domain/entities/Finance';
 import type { Habit } from '../../../domain/entities/Habit';
 import type { UserProfile } from '../../../domain/entities/Profile';
+import type { WeeklyPlan } from '../../../domain/entities/WeeklyPlan';
 
 interface HabitLog {
   habitId: string;
@@ -30,6 +31,7 @@ interface BudgetRecord {
 export interface WebState {
   habits: Habit[];
   habitLogs: HabitLog[];
+  weeklyPlans: WeeklyPlan[];
   incomes: IncomeRecord[];
   expenses: ExpenseRecord[];
   budgets: BudgetRecord[];
@@ -69,6 +71,7 @@ const defaultProfile: UserProfile = {
 const defaultState = (): WebState => ({
   habits: [],
   habitLogs: [],
+  weeklyPlans: [],
   incomes: [],
   expenses: [],
   budgets: [],
@@ -108,6 +111,7 @@ const readFromStorage = (): WebState | null => {
         ...defaultState().counters,
         ...(parsed.counters ?? {}),
       },
+      weeklyPlans: parsed.weeklyPlans ?? [],
       budgets: parsed.budgets ?? [],
     };
   } catch {

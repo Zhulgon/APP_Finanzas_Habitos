@@ -2,7 +2,7 @@
 
 Aplicacion personal para gestionar habitos, finanzas y progreso gamificado.
 
-## Que incluye (v1.1 estable)
+## Que incluye (v1.2 estable)
 
 - Habitos diarios/semanales con racha y progreso.
 - Registro de ingresos, gastos y presupuestos por categoria.
@@ -20,6 +20,12 @@ Aplicacion personal para gestionar habitos, finanzas y progreso gamificado.
   - estado de recordatorios mas robusto (permiso/activacion/error)
   - exportacion de resumen semanal en CSV desde `Progreso`
   - plan diario en Inicio + filtros rapidos de Finanzas (hoy/semana/mes)
+- Mejoras v1.2 activas:
+  - plan semanal con metas de habitos y ahorro
+  - comparativo semanal (actual vs anterior) con deltas y tendencia
+  - recomendaciones v2 priorizadas por impacto
+  - registro rapido en Home (habito, ingreso, gasto)
+  - backup `v2` compatible con backup `v1`
 
 ## Stack tecnico
 
@@ -91,10 +97,14 @@ docs/
   software-playbook.md
   release-checklist-v1.md
   release-checklist-v1.1.md
+  release-checklist-v1.2.md
   release-notes-v1.1.0.md
+  release-notes-v1.2.0.md
   sprint-v1.1.0-plan.md
+  sprint-v1.2.0-plan.md
 ```
 
 ## Roadmap inmediato
 
-- Base v1.1 cerrada. Siguiente iteracion sugerida: `v1.2.0`.
+- Base v1.2 cerrada.
+- Siguiente iteracion sugerida: `v1.3.0`.

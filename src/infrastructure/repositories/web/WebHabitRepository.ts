@@ -171,4 +171,11 @@ export class WebHabitRepository implements HabitRepository {
 
     return Array.from(uniqueDays).sort((a, b) => (a < b ? 1 : -1));
   }
+
+  async countCompletionsByDateRange(dateFrom: string, dateTo: string): Promise<number> {
+    const state = readWebState();
+    return state.habitLogs.filter(
+      (log) => log.completedAt >= dateFrom && log.completedAt <= dateTo,
+    ).length;
+  }
 }
