@@ -2,7 +2,7 @@
 
 Aplicacion personal para gestionar habitos, finanzas y progreso gamificado.
 
-## Que incluye (v1.0 en curso)
+## Que incluye (v1.0 estable)
 
 - Habitos diarios/semanales con racha y progreso.
 - Registro de ingresos, gastos y presupuestos por categoria.
@@ -54,6 +54,12 @@ Chequeo rapido local:
 
 ```bash
 npm run verify
+```
+
+Smoke QA de flujo completo:
+
+```bash
+npm test -- --runInBand tests/flows/appSmokeFlow.test.ts
 ```
 
 ## Reglas de juego (base)
