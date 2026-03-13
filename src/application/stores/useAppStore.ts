@@ -58,6 +58,10 @@ import {
   type WeeklySummary,
 } from '../services/weeklySummary';
 import {
+  buildRecommendationsV2,
+  type RecommendationV2,
+} from '../services/recommendationEngineV2';
+import {
   buildWeeklyComparison,
   emptyWeeklyComparison,
   type WeeklyComparison,
@@ -86,6 +90,7 @@ interface AppState {
   telemetry: BalanceTelemetry;
   weeklyPlanProgress: WeeklyPlanProgress;
   weeklyComparison: WeeklyComparison;
+  recommendationsV2: RecommendationV2[];
   weeklySummary: WeeklySummary;
   recentExpenses: ExpenseRecord[];
   recentIncomes: IncomeRecord[];
@@ -173,6 +178,7 @@ const emptyWeeklyPlanProgress: WeeklyPlanProgress = {
   status: 'unplanned',
 };
 const emptyWeeklyComparisonState: WeeklyComparison = emptyWeeklyComparison();
+const emptyRecommendations: RecommendationV2[] = [];
 const emptyWeekly = emptyWeeklySummary();
 
 interface SnapshotResult {
@@ -187,6 +193,7 @@ interface SnapshotResult {
   telemetry: BalanceTelemetry;
   weeklyPlanProgress: WeeklyPlanProgress;
   weeklyComparison: WeeklyComparison;
+  recommendationsV2: RecommendationV2[];
   weeklySummary: WeeklySummary;
   newlyUnlockedAchievementIds: string[];
   recentExpenses: ExpenseRecord[];
@@ -278,6 +285,23 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
   const previousBalance =
     previousWeekIncomes.reduce((acc, row) => acc + row.amount, 0) -
     previousWeekExpenses.reduce((acc, row) => acc + row.amount, 0);
+  const weeklyComparison = buildWeeklyComparison({
+    current: {
+      weekKey: weeklyPlanProgress.weekKey || toWeekKey(referenceDate),
+      dateFrom: currentWeekRange.dateFrom,
+      dateTo: currentWeekRange.dateTo,
+      completedHabits: weeklyPlanProgress.completedHabits,
+      balance: weeklyPlanProgress.currentSavings,
+    },
+    previous: {
+      weekKey: toWeekKey(previousReferenceDate),
+      dateFrom: previousWeekRange.dateFrom,
+      dateTo: previousWeekRange.dateTo,
+      completedHabits: previousWeekCompletions,
+      balance: previousBalance,
+    },
+    rewardHistory: profile.rewardHistory,
+  });
 
   return {
     profile,
@@ -301,22 +325,17 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
       financeSummary,
     }),
     weeklyPlanProgress,
-    weeklyComparison: buildWeeklyComparison({
-      current: {
-        weekKey: weeklyPlanProgress.weekKey || toWeekKey(referenceDate),
-        dateFrom: currentWeekRange.dateFrom,
-        dateTo: currentWeekRange.dateTo,
-        completedHabits: weeklyPlanProgress.completedHabits,
-        balance: weeklyPlanProgress.currentSavings,
-      },
-      previous: {
-        weekKey: toWeekKey(previousReferenceDate),
-        dateFrom: previousWeekRange.dateFrom,
-        dateTo: previousWeekRange.dateTo,
-        completedHabits: previousWeekCompletions,
-        balance: previousBalance,
-      },
-      rewardHistory: profile.rewardHistory,
+    weeklyComparison,
+    recommendationsV2: buildRecommendationsV2({
+      habitStats,
+      financeSummary,
+      weeklyPlanProgress,
+      weeklyComparison,
+      recentFinanceMovementToday:
+        recentExpenses.some((item) => item.recordedAt === toIsoDate(referenceDate)) ||
+        recentIncomes.some((item) => item.recordedAt === toIsoDate(referenceDate)),
+      lessons,
+      referenceDate,
     }),
     weeklySummary: buildWeeklySummary({
       referenceDate,
@@ -417,6 +436,7 @@ export const useAppStore = create<AppState>((set) => ({
   telemetry: emptyTelemetry,
   weeklyPlanProgress: emptyWeeklyPlanProgress,
   weeklyComparison: emptyWeeklyComparisonState,
+  recommendationsV2: emptyRecommendations,
   weeklySummary: emptyWeekly,
   recentExpenses: [],
   recentIncomes: [],

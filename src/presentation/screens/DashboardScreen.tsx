@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { MainTabParamList } from '../../app/navigation/MainTabs';
+import type { ExpenseCategory } from '../../domain/entities/Finance';
 import { useAppStore } from '../../application/stores/useAppStore';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { colors, radius, spacing } from '../../shared/theme/tokens';
@@ -9,7 +11,14 @@ import { clamp, formatCurrency } from '../../shared/utils/formatters';
 import { ProgressBar } from '../components/ProgressBar';
 import { SectionCard } from '../components/SectionCard';
 import { AppButton } from '../components/AppButton';
+import { AppInput } from '../components/AppInput';
 import { toIsoDate } from '../../shared/utils/date';
+import {
+  expenseSchema,
+  getValidationMessage,
+  incomeSchema,
+} from '../../application/validation/schemas';
+import { useUiStore } from '../stores/useUiStore';
 
 const toDimensionProgress = (xp: number): number => {
   const nextLevelWindow = 240;
@@ -22,19 +31,53 @@ const riskLabel: Record<'low' | 'medium' | 'high', string> = {
   high: 'Alto',
 };
 
+const recommendationPriorityLabel: Record<'high' | 'medium' | 'low', string> = {
+  high: 'Alta',
+  medium: 'Media',
+  low: 'Baja',
+};
+
+const weeklyPlanStatusLabel: Record<
+  'unplanned' | 'at_risk' | 'on_track' | 'achieved',
+  string
+> = {
+  unplanned: 'Sin plan',
+  at_risk: 'En riesgo',
+  on_track: 'En curso',
+  achieved: 'Logrado',
+};
+
 export const DashboardScreen = () => {
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   const profile = useAppStore((state) => state.profile);
+  const habits = useAppStore((state) => state.habits);
   const habitStats = useAppStore((state) => state.habitStats);
   const financeSummary = useAppStore((state) => state.financeSummary);
   const insights = useAppStore((state) => state.insights);
   const achievements = useAppStore((state) => state.achievements);
   const missions = useAppStore((state) => state.missions);
   const telemetry = useAppStore((state) => state.telemetry);
+  const weeklyPlanProgress = useAppStore((state) => state.weeklyPlanProgress);
+  const recommendationsV2 = useAppStore((state) => state.recommendationsV2);
   const weeklySummary = useAppStore((state) => state.weeklySummary);
   const recentExpenses = useAppStore((state) => state.recentExpenses);
   const recentIncomes = useAppStore((state) => state.recentIncomes);
   const lessons = useAppStore((state) => state.lessons);
+  const completeHabit = useAppStore((state) => state.completeHabit);
+  const addIncome = useAppStore((state) => state.addIncome);
+  const addExpense = useAppStore((state) => state.addExpense);
+  const showToast = useUiStore((state) => state.showToast);
+
+  const [selectedHabitId, setSelectedHabitId] = useState('');
+  const [quickIncome, setQuickIncome] = useState('');
+  const [quickExpense, setQuickExpense] = useState('');
+  const [quickExpenseCategory, setQuickExpenseCategory] =
+    useState<ExpenseCategory>('variable');
+  const [quickExpenseSubCategory, setQuickExpenseSubCategory] =
+    useState('Gasto rapido');
+  const [isSubmittingQuickHabit, setIsSubmittingQuickHabit] = useState(false);
+  const [isSubmittingQuickIncome, setIsSubmittingQuickIncome] = useState(false);
+  const [isSubmittingQuickExpense, setIsSubmittingQuickExpense] = useState(false);
 
   const habitsCompleted = habitStats.todayCompleted;
   const habitsTotal = habitStats.activeHabitsCount;
@@ -81,6 +124,94 @@ export const DashboardScreen = () => {
           };
 
   const topInsight = insights[0];
+
+  useEffect(() => {
+    if (habits.length === 0) {
+      setSelectedHabitId('');
+      return;
+    }
+    if (!selectedHabitId || !habits.some((habit) => habit.id === selectedHabitId)) {
+      setSelectedHabitId(habits[0].id);
+    }
+  }, [habits, selectedHabitId]);
+
+  const onQuickCompleteHabit = async () => {
+    if (!selectedHabitId) {
+      showToast('Primero crea o selecciona un habito.', 'info');
+      return;
+    }
+
+    setIsSubmittingQuickHabit(true);
+    try {
+      const completed = await completeHabit(selectedHabitId);
+      if (completed) {
+        showToast('Habito marcado desde Inicio.', 'success');
+      } else {
+        showToast('Ese habito ya estaba marcado hoy.', 'info');
+      }
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'No se pudo marcar el habito.',
+        'error',
+      );
+    } finally {
+      setIsSubmittingQuickHabit(false);
+    }
+  };
+
+  const onQuickAddIncome = async () => {
+    const parsed = incomeSchema.safeParse({
+      amount: quickIncome,
+    });
+    if (!parsed.success) {
+      showToast(getValidationMessage(parsed.error), 'error');
+      return;
+    }
+
+    setIsSubmittingQuickIncome(true);
+    try {
+      await addIncome(parsed.data.amount);
+      setQuickIncome('');
+      showToast('Ingreso rapido registrado.', 'success');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'No se pudo registrar ingreso.',
+        'error',
+      );
+    } finally {
+      setIsSubmittingQuickIncome(false);
+    }
+  };
+
+  const onQuickAddExpense = async () => {
+    const parsed = expenseSchema.safeParse({
+      amount: quickExpense,
+      category: quickExpenseCategory,
+      subCategory: quickExpenseSubCategory,
+    });
+    if (!parsed.success) {
+      showToast(getValidationMessage(parsed.error), 'error');
+      return;
+    }
+
+    setIsSubmittingQuickExpense(true);
+    try {
+      await addExpense(
+        parsed.data.amount,
+        parsed.data.category,
+        parsed.data.subCategory,
+      );
+      setQuickExpense('');
+      showToast('Gasto rapido registrado.', 'success');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'No se pudo registrar gasto.',
+        'error',
+      );
+    } finally {
+      setIsSubmittingQuickExpense(false);
+    }
+  };
 
   return (
     <ScreenContainer>
@@ -215,6 +346,178 @@ export const DashboardScreen = () => {
         </View>
         <Text style={styles.weeklyHeadline}>{weeklySummary.headline}</Text>
         <Text style={styles.priorityHint}>{weeklySummary.recommendation}</Text>
+      </SectionCard>
+
+      <SectionCard title="Plan semanal (v1.2)">
+        <Text style={styles.missionHint}>
+          Semana: {weeklyPlanProgress.weekKey || '-'} | Estado:{' '}
+          {weeklyPlanStatusLabel[weeklyPlanProgress.status]}
+        </Text>
+        <ProgressBar
+          label={`Habitos ${weeklyPlanProgress.completedHabits}/${weeklyPlanProgress.habitTarget}`}
+          value={Math.max(0, weeklyPlanProgress.habitProgressRate)}
+        />
+        <ProgressBar
+          label={`Ahorro ${formatCurrency(
+            weeklyPlanProgress.currentSavings,
+            profile?.currency ?? 'COP',
+          )} / ${formatCurrency(weeklyPlanProgress.savingsTarget, profile?.currency ?? 'COP')}`}
+          value={Math.max(0, weeklyPlanProgress.savingsProgressRate)}
+        />
+        <AppButton onPress={() => navigation.navigate('Progreso')} variant="secondary">
+          Ajustar plan semanal
+        </AppButton>
+      </SectionCard>
+
+      <SectionCard title="Recomendaciones v2">
+        {recommendationsV2.length === 0 ? (
+          <Text style={styles.missionHint}>
+            Sin recomendaciones por ahora. Mantener constancia ya es una buena señal.
+          </Text>
+        ) : (
+          recommendationsV2.map((recommendation) => (
+            <View key={recommendation.id} style={styles.recommendationRow}>
+              <View style={styles.recommendationHeader}>
+                <Text style={styles.recommendationTitle}>{recommendation.title}</Text>
+                <Text
+                  style={[
+                    styles.recommendationPriority,
+                    recommendation.priority === 'high'
+                      ? styles.recommendationPriorityHigh
+                      : recommendation.priority === 'medium'
+                        ? styles.recommendationPriorityMedium
+                        : styles.recommendationPriorityLow,
+                  ]}
+                >
+                  {recommendationPriorityLabel[recommendation.priority]}
+                </Text>
+              </View>
+              <Text style={styles.recommendationBody}>{recommendation.body}</Text>
+              <Pressable
+                style={styles.recommendationAction}
+                onPress={() => {
+                  if (recommendation.category === 'finance') {
+                    navigation.navigate('Finanzas');
+                    return;
+                  }
+                  if (recommendation.category === 'learning') {
+                    navigation.navigate('Aprender');
+                    return;
+                  }
+                  if (recommendation.category === 'weekly_plan') {
+                    navigation.navigate('Progreso');
+                    return;
+                  }
+                  navigation.navigate('Habitos');
+                }}
+              >
+                <Text style={styles.recommendationActionText}>
+                  {recommendation.actionLabel}
+                </Text>
+              </Pressable>
+            </View>
+          ))
+        )}
+      </SectionCard>
+
+      <SectionCard title="Registro rapido (v1.2)">
+        <View style={styles.quickBlock}>
+          <Text style={styles.quickTitle}>Habito rapido</Text>
+          {habits.length === 0 ? (
+            <Text style={styles.missionHint}>
+              No tienes habitos activos. Crea uno para usar este atajo.
+            </Text>
+          ) : (
+            <>
+              <View style={styles.rowWrap}>
+                {habits.slice(0, 6).map((habit) => (
+                  <Pressable
+                    key={habit.id}
+                    style={[
+                      styles.quickChip,
+                      selectedHabitId === habit.id && styles.quickChipSelected,
+                    ]}
+                    onPress={() => setSelectedHabitId(habit.id)}
+                  >
+                    <Text
+                      style={[
+                        styles.quickChipText,
+                        selectedHabitId === habit.id && styles.quickChipTextSelected,
+                      ]}
+                    >
+                      {habit.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <AppButton onPress={onQuickCompleteHabit} loading={isSubmittingQuickHabit}>
+                Marcar habito seleccionado
+              </AppButton>
+            </>
+          )}
+        </View>
+
+        <View style={styles.quickBlock}>
+          <Text style={styles.quickTitle}>Ingreso rapido</Text>
+          <View style={styles.quickRow}>
+            <AppInput
+              placeholder="Monto"
+              keyboardType="numeric"
+              value={quickIncome}
+              onChangeText={setQuickIncome}
+              style={styles.quickInput}
+            />
+            <View style={styles.quickButton}>
+              <AppButton onPress={onQuickAddIncome} loading={isSubmittingQuickIncome}>
+                Guardar
+              </AppButton>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.quickBlock}>
+          <Text style={styles.quickTitle}>Gasto rapido</Text>
+          <View style={styles.rowWrap}>
+            {(['fixed', 'variable', 'services'] as ExpenseCategory[]).map((category) => (
+              <Pressable
+                key={`quick-${category}`}
+                style={[
+                  styles.quickChip,
+                  quickExpenseCategory === category && styles.quickChipSelected,
+                ]}
+                onPress={() => setQuickExpenseCategory(category)}
+              >
+                <Text
+                  style={[
+                    styles.quickChipText,
+                    quickExpenseCategory === category && styles.quickChipTextSelected,
+                  ]}
+                >
+                  {category}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <AppInput
+            placeholder="Subcategoria"
+            value={quickExpenseSubCategory}
+            onChangeText={setQuickExpenseSubCategory}
+          />
+          <View style={styles.quickRow}>
+            <AppInput
+              placeholder="Monto"
+              keyboardType="numeric"
+              value={quickExpense}
+              onChangeText={setQuickExpense}
+              style={styles.quickInput}
+            />
+            <View style={styles.quickButton}>
+              <AppButton onPress={onQuickAddExpense} loading={isSubmittingQuickExpense}>
+                Guardar
+              </AppButton>
+            </View>
+          </View>
+        </View>
       </SectionCard>
 
       <SectionCard title="Panel financiero rapido">
@@ -495,6 +798,105 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '800',
     fontSize: 13,
+  },
+  recommendationRow: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.sm,
+    gap: 4,
+  },
+  recommendationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  recommendationTitle: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 13,
+    flex: 1,
+  },
+  recommendationPriority: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  recommendationPriorityHigh: {
+    color: colors.danger,
+  },
+  recommendationPriorityMedium: {
+    color: colors.warning,
+  },
+  recommendationPriorityLow: {
+    color: colors.success,
+  },
+  recommendationBody: {
+    color: colors.mutedText,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  recommendationAction: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: colors.surface,
+  },
+  recommendationActionText: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  quickBlock: {
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.sm,
+  },
+  quickTitle: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  rowWrap: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  quickChip: {
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: colors.surface,
+  },
+  quickChipSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  quickChipText: {
+    color: colors.mutedText,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  quickChipTextSelected: {
+    color: colors.text,
+    fontWeight: '700',
+  },
+  quickRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'flex-end',
+  },
+  quickInput: {
+    flex: 1,
+    minWidth: 120,
+  },
+  quickButton: {
+    width: 120,
   },
   moneyRow: {
     flexDirection: 'row',

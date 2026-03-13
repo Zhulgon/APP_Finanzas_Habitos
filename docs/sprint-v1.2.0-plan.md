@@ -74,19 +74,19 @@ Resultado esperado de negocio personal:
    - `setWeeklySavingsTarget`
    - `getWeeklyPlanProgress`
 4. [x] Crear servicio `weeklyComparison.ts` (semana actual vs anterior).
-5. [ ] Crear servicio `recommendationEngineV2.ts` con estrategia por prioridad.
+5. [x] Crear servicio `recommendationEngineV2.ts` con estrategia por prioridad.
 6. [x] Integrar en store central (`useAppStore`) modulo `weeklyPlan`.
-   - [ ] `weeklyComparison`
-   - [ ] `recommendationsV2`
-7. [ ] Crear bloque UI `Plan semanal` en Dashboard.
+   - [x] `weeklyComparison`
+   - [x] `recommendationsV2`
+7. [x] Crear bloque UI `Plan semanal` en Dashboard.
 8. [x] Crear bloque UI `Comparativo semanal` en Progreso.
-9. Crear `QuickActionsPanel` (registro rapido) en Home.
-10. Migrar backup a schema version `2` con compatibilidad backward.
+9. [x] Crear `QuickActionsPanel` (registro rapido) en Home.
+10. [x] Migrar backup a schema version `2` con compatibilidad backward.
 11. [x] Tests unitarios base:
     - [x] casos de uso de plan semanal
-    - [ ] comparativo semanal
-    - [ ] motor de recomendaciones v2
-12. QA manual + checklist v1.2.
+    - [x] comparativo semanal
+    - [x] motor de recomendaciones v2
+12. [x] QA tecnico + checklist v1.2.
 
 ## 6) Arquitectura y patrones (v1.2)
 
