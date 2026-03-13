@@ -5,6 +5,13 @@ import { readWebState, replaceWebState } from './storage';
 const categorySchema = z.enum(['fixed', 'variable', 'services']);
 const habitFrequencySchema = z.enum(['daily', 'weekly']);
 const habitCategorySchema = z.enum(['health', 'productivity', 'finance']);
+const weeklyPlanSchema = z.object({
+  weekKey: z.string(),
+  habitTarget: z.number().int().nonnegative(),
+  savingsTarget: z.number().nonnegative(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
 
 const backupSchema = z.object({
   version: z.literal(1),
@@ -73,6 +80,7 @@ const backupSchema = z.object({
         createdAt: z.string(),
       }),
     ),
+    weeklyPlans: z.array(weeklyPlanSchema).optional().default([]),
     habitLogs: z.array(
       z.object({
         habitId: z.string(),

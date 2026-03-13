@@ -67,26 +67,25 @@ Resultado esperado de negocio personal:
 
 ## 5) Backlog tecnico (ejecucion 1 por 1)
 
-1. Crear entidad `WeeklyPlan` y contrato de repositorio.
-2. Implementar repositorio Web/SQLite para `weekly_plan`.
-3. Crear casos de uso:
+1. [x] Crear entidad `WeeklyPlan` y contrato de repositorio.
+2. [x] Implementar repositorio Web/SQLite para `weekly_plan`.
+3. [x] Crear casos de uso:
    - `setWeeklyHabitTarget`
    - `setWeeklySavingsTarget`
    - `getWeeklyPlanProgress`
-4. Crear servicio `weeklyComparison.ts` (semana actual vs anterior).
-5. Crear servicio `recommendationEngineV2.ts` con estrategia por prioridad.
-6. Integrar en store central (`useAppStore`):
-   - `weeklyPlan`
-   - `weeklyComparison`
-   - `recommendationsV2`
-7. Crear bloque UI `Plan semanal` en Dashboard.
+4. [ ] Crear servicio `weeklyComparison.ts` (semana actual vs anterior).
+5. [ ] Crear servicio `recommendationEngineV2.ts` con estrategia por prioridad.
+6. [x] Integrar en store central (`useAppStore`) modulo `weeklyPlan`.
+   - [ ] `weeklyComparison`
+   - [ ] `recommendationsV2`
+7. [ ] Crear bloque UI `Plan semanal` en Dashboard.
 8. Crear bloque UI `Comparativo semanal` en Progreso.
 9. Crear `QuickActionsPanel` (registro rapido) en Home.
 10. Migrar backup a schema version `2` con compatibilidad backward.
-11. Tests unitarios:
-    - casos de uso de plan semanal
-    - comparativo semanal
-    - motor de recomendaciones v2
+11. [x] Tests unitarios base:
+    - [x] casos de uso de plan semanal
+    - [ ] comparativo semanal
+    - [ ] motor de recomendaciones v2
 12. QA manual + checklist v1.2.
 
 ## 6) Arquitectura y patrones (v1.2)

@@ -3,6 +3,7 @@ import { SQLiteFinanceRepository } from './SQLiteFinanceRepository';
 import { SQLiteHabitRepository } from './SQLiteHabitRepository';
 import { SQLiteLessonRepository } from './SQLiteLessonRepository';
 import { SQLiteProfileRepository } from './SQLiteProfileRepository';
+import { SQLiteWeeklyPlanRepository } from './SQLiteWeeklyPlanRepository';
 import { NativeBackupRepository } from './native/NativeBackupRepository';
 import type { RepositoryBundle } from './repositoryFactory.types';
 
@@ -13,6 +14,7 @@ export const createRepositoryBundle = (): RepositoryBundle => {
     financeRepository: new SQLiteFinanceRepository(),
     lessonRepository: new SQLiteLessonRepository(),
     profileRepository: new SQLiteProfileRepository(),
+    weeklyPlanRepository: new SQLiteWeeklyPlanRepository(),
     backupRepository: new NativeBackupRepository(),
   };
 };

@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useAppStore } from '../../application/stores/useAppStore';
 import { ScreenContainer } from '../components/ScreenContainer';
@@ -9,6 +9,7 @@ import { colors, radius, spacing } from '../../shared/theme/tokens';
 import type { RewardHistorySource } from '../../domain/entities/Profile';
 import { formatCurrency } from '../../shared/utils/formatters';
 import { AppButton } from '../components/AppButton';
+import { AppInput } from '../components/AppInput';
 import { useUiStore } from '../stores/useUiStore';
 import {
   buildWeeklySummaryCsv,
@@ -18,6 +19,10 @@ import {
   buildWeeklySummaryShareText,
   copyTextToClipboard,
 } from '../../application/services/weeklySummaryShare';
+import {
+  getValidationMessage,
+  weeklyPlanTargetsSchema,
+} from '../../application/validation/schemas';
 
 const toDimensionProgress = (xp: number): number => {
   const nextLevelWindow = 240;
@@ -48,15 +53,31 @@ const riskLabel: Record<'low' | 'medium' | 'high', string> = {
   high: 'Alto',
 };
 
+const weeklyPlanStatusLabel: Record<
+  'unplanned' | 'at_risk' | 'on_track' | 'achieved',
+  string
+> = {
+  unplanned: 'Sin plan',
+  at_risk: 'En riesgo',
+  on_track: 'En curso',
+  achieved: 'Logrado',
+};
+
 export const ProgressScreen = () => {
   const profile = useAppStore((state) => state.profile);
   const missions = useAppStore((state) => state.missions);
   const achievements = useAppStore((state) => state.achievements);
   const telemetry = useAppStore((state) => state.telemetry);
+  const weeklyPlanProgress = useAppStore((state) => state.weeklyPlanProgress);
   const weeklySummary = useAppStore((state) => state.weeklySummary);
+  const setWeeklyHabitTarget = useAppStore((state) => state.setWeeklyHabitTarget);
+  const setWeeklySavingsTarget = useAppStore((state) => state.setWeeklySavingsTarget);
   const showToast = useUiStore((state) => state.showToast);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
   const [isCopyingSummary, setIsCopyingSummary] = useState(false);
+  const [weeklyHabitTargetInput, setWeeklyHabitTargetInput] = useState('0');
+  const [weeklySavingsTargetInput, setWeeklySavingsTargetInput] = useState('0');
+  const [isSavingWeeklyPlan, setIsSavingWeeklyPlan] = useState(false);
 
   const completedMissions = missions.filter((mission) => mission.completed).length;
   const claimedMissions = missions.filter((mission) => mission.claimed).length;
@@ -64,6 +85,11 @@ export const ProgressScreen = () => {
     (achievement) => achievement.unlocked,
   ).length;
   const rewardHistory = profile?.rewardHistory.slice(0, 14) ?? [];
+
+  useEffect(() => {
+    setWeeklyHabitTargetInput(String(weeklyPlanProgress.habitTarget));
+    setWeeklySavingsTargetInput(String(weeklyPlanProgress.savingsTarget));
+  }, [weeklyPlanProgress.habitTarget, weeklyPlanProgress.savingsTarget]);
 
   const onExportWeeklyCsv = async () => {
     setIsExportingCsv(true);
@@ -100,6 +126,34 @@ export const ProgressScreen = () => {
       );
     } finally {
       setIsCopyingSummary(false);
+    }
+  };
+
+  const onSaveWeeklyPlan = async () => {
+    const result = weeklyPlanTargetsSchema.safeParse({
+      habitTarget: weeklyHabitTargetInput,
+      savingsTarget: weeklySavingsTargetInput,
+    });
+
+    if (!result.success) {
+      showToast(getValidationMessage(result.error), 'error');
+      return;
+    }
+
+    setIsSavingWeeklyPlan(true);
+    try {
+      await setWeeklyHabitTarget(result.data.habitTarget);
+      await setWeeklySavingsTarget(result.data.savingsTarget);
+      showToast('Plan semanal actualizado.', 'success');
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo actualizar el plan semanal.',
+        'error',
+      );
+    } finally {
+      setIsSavingWeeklyPlan(false);
     }
   };
 
@@ -163,6 +217,52 @@ export const ProgressScreen = () => {
         <Text style={styles.metricLine}>
           Riesgo de abandono: {riskLabel[telemetry.engagementRisk]}
         </Text>
+      </SectionCard>
+
+      <SectionCard title="Plan semanal (v1.2)">
+        <Text style={styles.metricLine}>Semana: {weeklyPlanProgress.weekKey || '-'}</Text>
+        <Text style={styles.metricLine}>
+          Periodo: {weeklyPlanProgress.dateFrom || '-'} a {weeklyPlanProgress.dateTo || '-'}
+        </Text>
+        <Text style={styles.metricLine}>
+          Estado: {weeklyPlanStatusLabel[weeklyPlanProgress.status]}
+        </Text>
+        <Text style={styles.metricLine}>
+          Habitos: {weeklyPlanProgress.completedHabits}/{weeklyPlanProgress.habitTarget}
+        </Text>
+        <ProgressBar
+          label="Avance de habitos"
+          value={Math.max(0, weeklyPlanProgress.habitProgressRate)}
+        />
+        <Text style={styles.metricLine}>
+          Ahorro semanal: {formatCurrency(weeklyPlanProgress.currentSavings, profile?.currency ?? 'COP')} /{' '}
+          {formatCurrency(weeklyPlanProgress.savingsTarget, profile?.currency ?? 'COP')}
+        </Text>
+        <ProgressBar
+          label="Avance de ahorro"
+          value={Math.max(0, weeklyPlanProgress.savingsProgressRate)}
+        />
+        <View style={styles.row}>
+          <AppInput
+            label="Meta habitos"
+            placeholder="0"
+            keyboardType="number-pad"
+            value={weeklyHabitTargetInput}
+            onChangeText={setWeeklyHabitTargetInput}
+            style={styles.planInput}
+          />
+          <AppInput
+            label="Meta ahorro"
+            placeholder="0"
+            keyboardType="numeric"
+            value={weeklySavingsTargetInput}
+            onChangeText={setWeeklySavingsTargetInput}
+            style={styles.planInput}
+          />
+        </View>
+        <AppButton onPress={onSaveWeeklyPlan} loading={isSavingWeeklyPlan}>
+          Guardar plan semanal
+        </AppButton>
       </SectionCard>
 
       <SectionCard title="Resumen semanal">
@@ -270,6 +370,15 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 12,
     lineHeight: 20,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  planInput: {
+    minWidth: 130,
+    flex: 1,
   },
   emptyText: {
     color: colors.mutedText,

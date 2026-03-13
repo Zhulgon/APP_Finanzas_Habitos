@@ -56,6 +56,14 @@ export const MIGRATIONS: string[] = [
     FOREIGN KEY (lesson_id) REFERENCES lessons(id)
   );
 
+  CREATE TABLE IF NOT EXISTS weekly_plan (
+    week_key TEXT PRIMARY KEY NOT NULL,
+    habit_target INTEGER NOT NULL DEFAULT 0,
+    savings_target REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS user_profile (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     name TEXT NOT NULL,
@@ -71,5 +79,6 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS idx_habit_logs_completed_at ON habit_logs(completed_at);
   CREATE INDEX IF NOT EXISTS idx_expenses_month_category ON expenses(recorded_at, category);
   CREATE INDEX IF NOT EXISTS idx_budgets_month_category ON budgets(month_key, category);
+  CREATE INDEX IF NOT EXISTS idx_weekly_plan_week_key ON weekly_plan(week_key);
   `,
 ];

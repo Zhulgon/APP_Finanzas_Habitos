@@ -11,6 +11,9 @@ import type { FinanceRepository } from '../../src/domain/repositories/FinanceRep
 import type { HabitRepository } from '../../src/domain/repositories/HabitRepository';
 import type { LessonRepository } from '../../src/domain/repositories/LessonRepository';
 import type { ProfileRepository } from '../../src/domain/repositories/ProfileRepository';
+import type { WeeklyPlanRepository } from '../../src/domain/repositories/WeeklyPlanRepository';
+import type { WeeklyPlan } from '../../src/domain/entities/WeeklyPlan';
+import { toIsoDate, toWeekKey } from '../../src/shared/utils/date';
 
 const emptySummary: MonthlyFinanceSummary = {
   income: 0,
@@ -62,6 +65,7 @@ export const createHabitRepositoryMock = (
   logCompletion: async () => false,
   getStats: async () => emptyHabitStats,
   listCompletionDates: async (): Promise<string[]> => [],
+  countCompletionsByDateRange: async () => 0,
   ...overrides,
 });
 
@@ -95,5 +99,31 @@ export const createProfileRepositoryMock = (
   updateProfile: async () => {},
   addXp: async () => emptyProfile,
   applyGamification: async () => emptyProfile,
+  ...overrides,
+});
+
+const emptyWeeklyPlan = (referenceDate = new Date()): WeeklyPlan => {
+  const todayIso = toIsoDate(referenceDate);
+  return {
+    weekKey: toWeekKey(referenceDate),
+    habitTarget: 0,
+    savingsTarget: 0,
+    createdAt: todayIso,
+    updatedAt: todayIso,
+  };
+};
+
+export const createWeeklyPlanRepositoryMock = (
+  overrides: Partial<WeeklyPlanRepository> = {},
+): WeeklyPlanRepository => ({
+  getWeeklyPlan: async (referenceDate) => emptyWeeklyPlan(referenceDate),
+  setWeeklyHabitTarget: async (referenceDate, target) => ({
+    ...emptyWeeklyPlan(referenceDate),
+    habitTarget: target,
+  }),
+  setWeeklySavingsTarget: async (referenceDate, target) => ({
+    ...emptyWeeklyPlan(referenceDate),
+    savingsTarget: target,
+  }),
   ...overrides,
 });

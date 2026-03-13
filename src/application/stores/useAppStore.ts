@@ -14,6 +14,7 @@ import type {
 } from '../../domain/entities/Habit';
 import type { LessonWithStatus } from '../../domain/entities/Lesson';
 import type { UserProfile } from '../../domain/entities/Profile';
+import type { WeeklyPlanProgress } from '../../domain/entities/WeeklyPlan';
 import { createRepositoryBundle } from '../../infrastructure/repositories/repositoryFactory';
 import { createHabitUseCase } from '../../domain/use-cases/habits/createHabit';
 import { archiveHabitUseCase } from '../../domain/use-cases/habits/archiveHabit';
@@ -23,6 +24,9 @@ import { registerExpenseUseCase } from '../../domain/use-cases/finance/registerE
 import { registerIncomeUseCase } from '../../domain/use-cases/finance/registerIncome';
 import { setMonthlyBudgetUseCase } from '../../domain/use-cases/finance/setMonthlyBudget';
 import { completeLessonUseCase } from '../../domain/use-cases/learning/completeLesson';
+import { getWeeklyPlanProgressUseCase } from '../../domain/use-cases/weekly-plan/getWeeklyPlanProgress';
+import { setWeeklyHabitTargetUseCase } from '../../domain/use-cases/weekly-plan/setWeeklyHabitTarget';
+import { setWeeklySavingsTargetUseCase } from '../../domain/use-cases/weekly-plan/setWeeklySavingsTarget';
 import {
   buildProgressInsights,
   type AchievementBadge,
@@ -70,6 +74,7 @@ interface AppState {
   achievements: AchievementBadge[];
   missions: Mission[];
   telemetry: BalanceTelemetry;
+  weeklyPlanProgress: WeeklyPlanProgress;
   weeklySummary: WeeklySummary;
   recentExpenses: ExpenseRecord[];
   recentIncomes: IncomeRecord[];
@@ -103,6 +108,8 @@ interface AppState {
   buyAvatarItem: (item: string, cost: number) => Promise<boolean>;
   updateAvatar: (avatarColor: string, avatarItem: string) => Promise<void>;
   useStreakFreeze: () => Promise<{ ok: boolean; message: string }>;
+  setWeeklyHabitTarget: (target: number) => Promise<void>;
+  setWeeklySavingsTarget: (target: number) => Promise<void>;
   updateProfile: (input: {
     name: string;
     objective: string;
@@ -142,6 +149,18 @@ const emptyTelemetry: BalanceTelemetry = {
   savingsRate: 0,
   engagementRisk: 'high',
 };
+const emptyWeeklyPlanProgress: WeeklyPlanProgress = {
+  weekKey: '',
+  dateFrom: '',
+  dateTo: '',
+  habitTarget: 0,
+  completedHabits: 0,
+  habitProgressRate: 0,
+  savingsTarget: 0,
+  currentSavings: 0,
+  savingsProgressRate: 0,
+  status: 'unplanned',
+};
 const emptyWeekly = emptyWeeklySummary();
 
 interface SnapshotResult {
@@ -154,6 +173,7 @@ interface SnapshotResult {
   achievements: AchievementBadge[];
   missions: Mission[];
   telemetry: BalanceTelemetry;
+  weeklyPlanProgress: WeeklyPlanProgress;
   weeklySummary: WeeklySummary;
   newlyUnlockedAchievementIds: string[];
   recentExpenses: ExpenseRecord[];
@@ -230,6 +250,14 @@ const refreshSnapshots = async (): Promise<SnapshotResult> => {
       habitStats,
       financeSummary,
     }),
+    weeklyPlanProgress: await getWeeklyPlanProgressUseCase(
+      {
+        weeklyPlanRepository: repositories.weeklyPlanRepository,
+        habitRepository: repositories.habitRepository,
+        financeRepository: repositories.financeRepository,
+      },
+      referenceDate,
+    ),
     weeklySummary: buildWeeklySummary({
       referenceDate,
       habitStats,
@@ -327,6 +355,7 @@ export const useAppStore = create<AppState>((set) => ({
   achievements: emptyAchievements,
   missions: emptyMissions,
   telemetry: emptyTelemetry,
+  weeklyPlanProgress: emptyWeeklyPlanProgress,
   weeklySummary: emptyWeekly,
   recentExpenses: [],
   recentIncomes: [],
@@ -567,6 +596,24 @@ export const useAppStore = create<AppState>((set) => ({
       ok: true,
       message: `Racha protegida para ${missedDate}.`,
     };
+  },
+  async setWeeklyHabitTarget(target) {
+    await setWeeklyHabitTargetUseCase(
+      repositories.weeklyPlanRepository,
+      target,
+      new Date(),
+    );
+    const snapshots = await refreshSnapshotsWithProgression();
+    set({ ...snapshots });
+  },
+  async setWeeklySavingsTarget(target) {
+    await setWeeklySavingsTargetUseCase(
+      repositories.weeklyPlanRepository,
+      target,
+      new Date(),
+    );
+    const snapshots = await refreshSnapshotsWithProgression();
+    set({ ...snapshots });
   },
   async updateProfile(input) {
     await repositories.profileRepository.updateProfile({

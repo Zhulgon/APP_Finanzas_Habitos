@@ -77,6 +77,17 @@ export const reminderTimeSchema = z.object({
     .max(59, 'El minuto debe estar entre 0 y 59.'),
 });
 
+export const weeklyPlanTargetsSchema = z.object({
+  habitTarget: z.coerce
+    .number({ message: 'La meta de habitos debe ser numerica.' })
+    .int('La meta de habitos debe ser un numero entero.')
+    .min(0, 'La meta de habitos no puede ser negativa.')
+    .max(70, 'La meta de habitos no debe superar 70 por semana.'),
+  savingsTarget: z.coerce
+    .number({ message: 'La meta de ahorro debe ser numerica.' })
+    .min(0, 'La meta de ahorro no puede ser negativa.'),
+});
+
 export const getValidationMessage = (error: z.ZodError): string => {
   return error.issues[0]?.message ?? 'Revisa los datos ingresados.';
 };
