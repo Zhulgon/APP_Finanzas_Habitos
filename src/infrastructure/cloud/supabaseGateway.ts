@@ -101,30 +101,35 @@ export const verifySupabaseOtp = async (
       message: 'No hay cliente HTTP disponible para verificar OTP.',
     };
   }
+  const verificationTypes = ['email', 'signup', 'magiclink'] as const;
 
-  const response = await fetcher(`${config.url}/auth/v1/verify`, {
-    method: 'POST',
-    headers: buildHeaders(config),
-    body: JSON.stringify({
-      email,
-      token: code,
-      type: 'email',
-    }),
-  });
+  for (const type of verificationTypes) {
+    const response = await fetcher(`${config.url}/auth/v1/verify`, {
+      method: 'POST',
+      headers: buildHeaders(config),
+      body: JSON.stringify({
+        email,
+        token: code,
+        type,
+      }),
+    });
 
-  if (!response.ok) {
+    if (!response.ok) {
+      continue;
+    }
+
+    const payload = (await response.json()) as SupabaseVerifyResponse;
     return {
-      ok: false,
-      message: `Codigo invalido o expirado (status ${response.status}).`,
+      ok: true,
+      message: 'Sesion iniciada correctamente.',
+      userId: payload.user?.id,
+      accessToken: payload.access_token,
     };
   }
 
-  const payload = (await response.json()) as SupabaseVerifyResponse;
   return {
-    ok: true,
-    message: 'Sesion iniciada correctamente.',
-    userId: payload.user?.id,
-    accessToken: payload.access_token,
+    ok: false,
+    message: 'Codigo invalido o expirado. Solicita uno nuevo e intenta de inmediato.',
   };
 };
 
@@ -226,4 +231,3 @@ export const pullSnapshotFromSupabase = async (
     updatedAt: row.updated_at,
   };
 };
-
