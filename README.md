@@ -18,6 +18,8 @@ Aplicacion personal para gestionar habitos, finanzas y progreso gamificado.
 - Mejoras v1.1 ya activas:
   - resumen semanal automatico (habitos, balance, XP, monedas)
   - estado de recordatorios mas robusto (permiso/activacion/error)
+  - exportacion de resumen semanal en CSV desde `Progreso`
+  - plan diario en Inicio + filtros rapidos de Finanzas (hoy/semana/mes)
 
 ## Stack tecnico
 
@@ -88,6 +90,7 @@ src/
 docs/
   software-playbook.md
   release-checklist-v1.md
+  release-checklist-v1.1.md
   sprint-v1.1.0-plan.md
 ```
 

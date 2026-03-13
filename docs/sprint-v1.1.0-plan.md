@@ -73,8 +73,8 @@ Hacer la app mas util en uso real diario con foco en:
 
 ## 7) Checklist de cierre v1.1
 
-- [ ] `npm run verify` en verde.
-- [ ] `npx expo export --platform web` en verde.
+- [x] `npm run verify` en verde.
+- [x] `npx expo export --platform web` en verde.
 - [ ] QA manual de recordatorios.
 - [ ] QA de resumen/export semanal.
 - [ ] Release notes `v1.1.0`.
