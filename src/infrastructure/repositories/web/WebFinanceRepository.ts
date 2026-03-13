@@ -130,6 +130,21 @@ export class WebFinanceRepository implements FinanceRepository {
       .slice(0, limit);
   }
 
+  async listExpensesByDateRange(
+    dateFrom: string,
+    dateTo: string,
+  ): Promise<ExpenseRecord[]> {
+    const state = readWebState();
+    return state.expenses
+      .filter((expense) => expense.recordedAt >= dateFrom && expense.recordedAt <= dateTo)
+      .sort((a, b) => {
+        if (a.recordedAt !== b.recordedAt) {
+          return a.recordedAt < b.recordedAt ? 1 : -1;
+        }
+        return b.id - a.id;
+      });
+  }
+
   async listRecentIncomes(limit: number): Promise<IncomeRecord[]> {
     const state = readWebState();
     return [...state.incomes]
@@ -140,6 +155,21 @@ export class WebFinanceRepository implements FinanceRepository {
         return b.id - a.id;
       })
       .slice(0, limit);
+  }
+
+  async listIncomesByDateRange(
+    dateFrom: string,
+    dateTo: string,
+  ): Promise<IncomeRecord[]> {
+    const state = readWebState();
+    return state.incomes
+      .filter((income) => income.recordedAt >= dateFrom && income.recordedAt <= dateTo)
+      .sort((a, b) => {
+        if (a.recordedAt !== b.recordedAt) {
+          return a.recordedAt < b.recordedAt ? 1 : -1;
+        }
+        return b.id - a.id;
+      });
   }
 
   async getMonthlySummary(referenceDate: Date): Promise<MonthlyFinanceSummary> {

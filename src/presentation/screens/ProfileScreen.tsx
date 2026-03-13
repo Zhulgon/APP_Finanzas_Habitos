@@ -14,7 +14,9 @@ import {
 import { useUiStore } from '../stores/useUiStore';
 import {
   disableHabitReminder,
+  getHabitReminderStatus,
   scheduleDailyHabitReminder,
+  type HabitReminderStatus,
 } from '../../application/services/reminders';
 
 const avatarColors = ['#0f766e', '#2563eb', '#b45309', '#be123c'];
@@ -116,6 +118,14 @@ export const ProfileScreen = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
   const [isBackupLoading, setIsBackupLoading] = useState(false);
+  const [reminderStatus, setReminderStatus] = useState<HabitReminderStatus>({
+    supported: Platform.OS !== 'web',
+    enabled: false,
+    message:
+      Platform.OS === 'web'
+        ? 'Recordatorios nativos no disponibles en web.'
+        : 'Consultando estado de recordatorios...',
+  });
 
   useEffect(() => {
     if (!profile) {
@@ -129,6 +139,13 @@ export const ProfileScreen = () => {
     setAvatarColor(profile.avatarColor);
     setAvatarItem(profile.avatarItem);
   }, [profile]);
+
+  useEffect(() => {
+    void (async () => {
+      const status = await getHabitReminderStatus();
+      setReminderStatus(status);
+    })();
+  }, []);
 
   const onSave = async () => {
     const result = profileSchema.safeParse({
@@ -180,19 +197,29 @@ export const ProfileScreen = () => {
     }
 
     setIsScheduling(true);
-    const response = await scheduleDailyHabitReminder(
-      result.data.hour,
-      result.data.minute,
-    );
-    showToast(response.message, response.ok ? 'success' : 'error');
-    setIsScheduling(false);
+    try {
+      const response = await scheduleDailyHabitReminder(
+        result.data.hour,
+        result.data.minute,
+      );
+      showToast(response.message, response.ok ? 'success' : 'error');
+      const status = await getHabitReminderStatus();
+      setReminderStatus(status);
+    } finally {
+      setIsScheduling(false);
+    }
   };
 
   const onDisableReminder = async () => {
     setIsScheduling(true);
-    const response = await disableHabitReminder();
-    showToast(response.message, response.ok ? 'info' : 'error');
-    setIsScheduling(false);
+    try {
+      const response = await disableHabitReminder();
+      showToast(response.message, response.ok ? 'info' : 'error');
+      const status = await getHabitReminderStatus();
+      setReminderStatus(status);
+    } finally {
+      setIsScheduling(false);
+    }
   };
 
   const onUseStreakFreeze = async () => {
@@ -390,6 +417,35 @@ export const ProfileScreen = () => {
       </SectionCard>
 
       <SectionCard title="Recordatorio diario">
+        <View
+          style={[
+            styles.statusRow,
+            !reminderStatus.supported && styles.statusRowNeutral,
+            reminderStatus.supported &&
+              !reminderStatus.enabled &&
+              styles.statusRowWarning,
+          ]}
+        >
+          <View
+            style={[
+              styles.statusDot,
+              !reminderStatus.supported && styles.statusDotMuted,
+              reminderStatus.supported &&
+                !reminderStatus.enabled &&
+                styles.statusDotWarning,
+            ]}
+          />
+          <View style={styles.statusTextBlock}>
+            <Text style={styles.statusTitle}>
+              {reminderStatus.supported
+                ? reminderStatus.enabled
+                  ? 'Recordatorio activo'
+                  : 'Recordatorio inactivo'
+                : 'Recordatorio no disponible'}
+            </Text>
+            <Text style={styles.statusBody}>{reminderStatus.message}</Text>
+          </View>
+        </View>
         <View style={styles.row}>
           <AppInput
             label="Hora"
@@ -410,12 +466,20 @@ export const ProfileScreen = () => {
         </View>
         <View style={styles.row}>
           <View style={styles.flex}>
-            <AppButton onPress={onScheduleReminder} loading={isScheduling}>
+            <AppButton
+              onPress={onScheduleReminder}
+              loading={isScheduling}
+              disabled={!reminderStatus.supported}
+            >
               Activar recordatorio
             </AppButton>
           </View>
           <View style={styles.flex}>
-            <AppButton onPress={onDisableReminder} variant="secondary" disabled={isScheduling}>
+            <AppButton
+              onPress={onDisableReminder}
+              variant="secondary"
+              disabled={isScheduling || !reminderStatus.supported}
+            >
               Desactivar
             </AppButton>
           </View>
@@ -606,6 +670,18 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginTop: 4,
     backgroundColor: colors.success,
+  },
+  statusDotWarning: {
+    backgroundColor: colors.warning,
+  },
+  statusDotMuted: {
+    backgroundColor: colors.mutedText,
+  },
+  statusRowWarning: {
+    backgroundColor: '#fff9f2',
+  },
+  statusRowNeutral: {
+    backgroundColor: '#f4f7f6',
   },
   statusTextBlock: {
     flex: 1,

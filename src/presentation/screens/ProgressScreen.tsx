@@ -6,6 +6,7 @@ import { SectionCard } from '../components/SectionCard';
 import { ProgressBar } from '../components/ProgressBar';
 import { colors, radius, spacing } from '../../shared/theme/tokens';
 import type { RewardHistorySource } from '../../domain/entities/Profile';
+import { formatCurrency } from '../../shared/utils/formatters';
 
 const toDimensionProgress = (xp: number): number => {
   const nextLevelWindow = 240;
@@ -41,6 +42,7 @@ export const ProgressScreen = () => {
   const missions = useAppStore((state) => state.missions);
   const achievements = useAppStore((state) => state.achievements);
   const telemetry = useAppStore((state) => state.telemetry);
+  const weeklySummary = useAppStore((state) => state.weeklySummary);
 
   const completedMissions = missions.filter((mission) => mission.completed).length;
   const claimedMissions = missions.filter((mission) => mission.claimed).length;
@@ -109,6 +111,31 @@ export const ProgressScreen = () => {
         <Text style={styles.metricLine}>
           Riesgo de abandono: {riskLabel[telemetry.engagementRisk]}
         </Text>
+      </SectionCard>
+
+      <SectionCard title="Resumen semanal">
+        <Text style={styles.metricLine}>Periodo: {weeklySummary.periodLabel}</Text>
+        <Text style={styles.metricLine}>
+          Dias activos: {weeklySummary.activeDays}/7
+        </Text>
+        <Text style={styles.metricLine}>
+          Habitos: {weeklySummary.habitCompletionRate.toFixed(0)}%
+        </Text>
+        <Text style={styles.metricLine}>
+          Ingresos: {formatCurrency(weeklySummary.incomesTotal, profile?.currency ?? 'COP')}
+        </Text>
+        <Text style={styles.metricLine}>
+          Gastos: {formatCurrency(weeklySummary.expensesTotal, profile?.currency ?? 'COP')}
+        </Text>
+        <Text style={styles.metricLine}>
+          Balance: {formatCurrency(weeklySummary.balance, profile?.currency ?? 'COP')}
+        </Text>
+        <Text style={styles.metricLine}>
+          XP ganada: {weeklySummary.xpEarned} | Monedas +{weeklySummary.coinsEarned} / -
+          {weeklySummary.coinsSpent}
+        </Text>
+        <Text style={styles.summaryHeadline}>{weeklySummary.headline}</Text>
+        <Text style={styles.emptyText}>{weeklySummary.recommendation}</Text>
       </SectionCard>
 
       <SectionCard title="Timeline de recompensas">
@@ -186,6 +213,11 @@ const styles = StyleSheet.create({
     color: colors.mutedText,
     fontSize: 12,
     lineHeight: 18,
+  },
+  summaryHeadline: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
   },
   historyRow: {
     borderTopWidth: 1,

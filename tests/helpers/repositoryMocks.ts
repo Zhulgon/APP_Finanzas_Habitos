@@ -74,6 +74,8 @@ export const createFinanceRepositoryMock = (
   getBudgetProgress: async (): Promise<BudgetProgress[]> => [],
   listRecentExpenses: async (): Promise<ExpenseRecord[]> => [],
   listRecentIncomes: async (): Promise<IncomeRecord[]> => [],
+  listExpensesByDateRange: async (): Promise<ExpenseRecord[]> => [],
+  listIncomesByDateRange: async (): Promise<IncomeRecord[]> => [],
   getMonthlySummary: async () => emptySummary,
   ...overrides,
 });

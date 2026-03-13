@@ -2,7 +2,7 @@
 
 Aplicacion personal para gestionar habitos, finanzas y progreso gamificado.
 
-## Que incluye (v1.0 estable)
+## Que incluye (v1.1 en progreso)
 
 - Habitos diarios/semanales con racha y progreso.
 - Registro de ingresos, gastos y presupuestos por categoria.
@@ -15,6 +15,9 @@ Aplicacion personal para gestionar habitos, finanzas y progreso gamificado.
   - logros desbloqueables
   - monedas, tienda de avatar y comodin de racha
   - timeline de recompensas en pantalla `Progreso`
+- Mejoras v1.1 ya activas:
+  - resumen semanal automatico (habitos, balance, XP, monedas)
+  - estado de recordatorios mas robusto (permiso/activacion/error)
 
 ## Stack tecnico
 
