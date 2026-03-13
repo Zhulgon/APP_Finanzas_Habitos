@@ -3,6 +3,7 @@ import type { Habit, HabitStats } from '../../../domain/entities/Habit';
 import type {
   CreateHabitInput,
   HabitRepository,
+  UpdateHabitInput,
 } from '../../../domain/repositories/HabitRepository';
 import { toIsoDate } from '../../../shared/utils/date';
 import { clamp } from '../../../shared/utils/formatters';
@@ -30,6 +31,36 @@ export class WebHabitRepository implements HabitRepository {
         ...state.habits,
       ],
     }));
+  }
+
+  async updateHabit(input: UpdateHabitInput): Promise<boolean> {
+    let wasUpdated = false;
+    updateWebState((state) => {
+      const nextHabits = state.habits.map((habit) => {
+        if (habit.id !== input.id || !habit.isActive) {
+          return habit;
+        }
+        wasUpdated = true;
+        return {
+          ...habit,
+          name: input.name,
+          frequency: input.frequency,
+          targetPerWeek: input.targetPerWeek,
+          category: input.category,
+        };
+      });
+
+      if (!wasUpdated) {
+        return state;
+      }
+
+      return {
+        ...state,
+        habits: nextHabits,
+      };
+    });
+
+    return wasUpdated;
   }
 
   async archiveHabit(habitId: string): Promise<boolean> {

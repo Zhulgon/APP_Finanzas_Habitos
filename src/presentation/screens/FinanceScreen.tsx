@@ -1,3 +1,4 @@
+import { startOfMonth, subDays } from 'date-fns';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ExpenseCategory } from '../../domain/entities/Finance';
@@ -18,6 +19,12 @@ import {
 } from '../../application/validation/schemas';
 import { useUiStore } from '../stores/useUiStore';
 import { ProgressBar } from '../components/ProgressBar';
+import { toIsoDate } from '../../shared/utils/date';
+import {
+  buildMovementTotals,
+  filterMovementsByDateRange,
+  validateDateRange,
+} from '../../application/services/financeFilters';
 
 const expenseCategories: ExpenseCategory[] = ['fixed', 'variable', 'services'];
 
@@ -38,6 +45,8 @@ export const FinanceScreen = () => {
   const [category, setCategory] = useState<ExpenseCategory>('fixed');
   const [budgetCategory, setBudgetCategory] = useState<ExpenseCategory>('fixed');
   const [budgetAmount, setBudgetAmount] = useState('');
+  const [dateFrom, setDateFrom] = useState(() => toIsoDate(subDays(new Date(), 29)));
+  const [dateTo, setDateTo] = useState(() => toIsoDate(new Date()));
   const [isSavingIncome, setIsSavingIncome] = useState(false);
   const [isSavingExpense, setIsSavingExpense] = useState(false);
   const [isSavingBudget, setIsSavingBudget] = useState(false);
@@ -53,6 +62,38 @@ export const FinanceScreen = () => {
     }
     return { text: 'Riesgo', color: colors.danger };
   }, [financeSummary.savingsRate]);
+
+  const rangeValidation = useMemo(
+    () => validateDateRange(dateFrom, dateTo),
+    [dateFrom, dateTo],
+  );
+
+  const filteredExpenses = useMemo(
+    () => filterMovementsByDateRange(recentExpenses, dateFrom, dateTo),
+    [recentExpenses, dateFrom, dateTo],
+  );
+
+  const filteredIncomes = useMemo(
+    () => filterMovementsByDateRange(recentIncomes, dateFrom, dateTo),
+    [recentIncomes, dateFrom, dateTo],
+  );
+
+  const movementTotals = useMemo(
+    () => buildMovementTotals(filteredIncomes, filteredExpenses),
+    [filteredIncomes, filteredExpenses],
+  );
+
+  const onApplyDaysRange = (days: number) => {
+    const endDate = new Date();
+    setDateTo(toIsoDate(endDate));
+    setDateFrom(toIsoDate(subDays(endDate, days - 1)));
+  };
+
+  const onApplyCurrentMonth = () => {
+    const endDate = new Date();
+    setDateTo(toIsoDate(endDate));
+    setDateFrom(toIsoDate(startOfMonth(endDate)));
+  };
 
   const onAddIncome = async () => {
     const result = incomeSchema.safeParse({
@@ -160,6 +201,45 @@ export const FinanceScreen = () => {
         </Text>
       </View>
 
+      <SectionCard title="Filtro de movimientos por fecha">
+        <View style={styles.row}>
+          <AppInput
+            label="Desde"
+            placeholder="YYYY-MM-DD"
+            value={dateFrom}
+            onChangeText={setDateFrom}
+            style={styles.dateInput}
+          />
+          <AppInput
+            label="Hasta"
+            placeholder="YYYY-MM-DD"
+            value={dateTo}
+            onChangeText={setDateTo}
+            style={styles.dateInput}
+          />
+        </View>
+        <View style={styles.row}>
+          <Pressable style={styles.filterChip} onPress={() => onApplyDaysRange(7)}>
+            <Text style={styles.filterChipText}>Ultimos 7 dias</Text>
+          </Pressable>
+          <Pressable style={styles.filterChip} onPress={() => onApplyDaysRange(30)}>
+            <Text style={styles.filterChipText}>Ultimos 30 dias</Text>
+          </Pressable>
+          <Pressable style={styles.filterChip} onPress={onApplyCurrentMonth}>
+            <Text style={styles.filterChipText}>Mes actual</Text>
+          </Pressable>
+        </View>
+        {!rangeValidation.ok ? (
+          <Text style={styles.rangeError}>{rangeValidation.message}</Text>
+        ) : (
+          <Text style={styles.rangeSummary}>
+            En rango: ingresos {formatCurrency(movementTotals.incomesTotal, currency)} | gastos{' '}
+            {formatCurrency(movementTotals.expensesTotal, currency)} | balance{' '}
+            {formatCurrency(movementTotals.balance, currency)}
+          </Text>
+        )}
+      </SectionCard>
+
       <SectionCard title="Registrar ingreso">
         <AppInput
           label="Monto"
@@ -191,10 +271,7 @@ export const FinanceScreen = () => {
           {expenseCategories.map((item) => (
             <Pressable
               key={item}
-              style={[
-                styles.selector,
-                category === item && styles.selectorSelected,
-              ]}
+              style={[styles.selector, category === item && styles.selectorSelected]}
               onPress={() => setCategory(item)}
             >
               <Text
@@ -225,10 +302,7 @@ export const FinanceScreen = () => {
           {expenseCategories.map((item) => (
             <Pressable
               key={`budget-${item}`}
-              style={[
-                styles.selector,
-                budgetCategory === item && styles.selectorSelected,
-              ]}
+              style={[styles.selector, budgetCategory === item && styles.selectorSelected]}
               onPress={() => setBudgetCategory(item)}
             >
               <Text
@@ -293,14 +367,14 @@ export const FinanceScreen = () => {
         )}
       </SectionCard>
 
-      <SectionCard title="Ultimos gastos">
-        {recentExpenses.length === 0 ? (
+      <SectionCard title={`Ultimos gastos (${filteredExpenses.length})`}>
+        {filteredExpenses.length === 0 ? (
           <EmptyState
-            title="Aun no hay movimientos"
-            body="Agrega tu primer gasto para empezar a ver patrones de consumo."
+            title="No hay gastos en este rango"
+            body="Prueba otro rango de fechas o registra un gasto nuevo."
           />
         ) : (
-          recentExpenses.map((item) => (
+          filteredExpenses.map((item) => (
             <View key={item.id} style={styles.expenseRow}>
               <View>
                 <Text style={styles.expenseName}>{item.subCategory}</Text>
@@ -316,14 +390,14 @@ export const FinanceScreen = () => {
         )}
       </SectionCard>
 
-      <SectionCard title="Ultimos ingresos">
-        {recentIncomes.length === 0 ? (
+      <SectionCard title={`Ultimos ingresos (${filteredIncomes.length})`}>
+        {filteredIncomes.length === 0 ? (
           <EmptyState
-            title="Aun no hay ingresos registrados"
-            body="Registra tu primer ingreso para tener trazabilidad mensual."
+            title="No hay ingresos en este rango"
+            body="Prueba otro rango de fechas o registra un ingreso nuevo."
           />
         ) : (
-          recentIncomes.map((item) => (
+          filteredIncomes.map((item) => (
             <View key={`income-${item.id}`} style={styles.expenseRow}>
               <View>
                 <Text style={styles.expenseName}>
@@ -377,6 +451,32 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  dateInput: {
+    minWidth: 130,
+    flex: 1,
+  },
+  filterChip: {
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    backgroundColor: colors.surface,
+  },
+  filterChipText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  rangeError: {
+    color: colors.danger,
+    fontSize: 12,
+  },
+  rangeSummary: {
+    color: colors.mutedText,
+    fontSize: 12,
   },
   selector: {
     flex: 1,

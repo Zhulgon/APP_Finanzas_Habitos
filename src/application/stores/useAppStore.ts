@@ -17,6 +17,7 @@ import type { UserProfile } from '../../domain/entities/Profile';
 import { createRepositoryBundle } from '../../infrastructure/repositories/repositoryFactory';
 import { createHabitUseCase } from '../../domain/use-cases/habits/createHabit';
 import { archiveHabitUseCase } from '../../domain/use-cases/habits/archiveHabit';
+import { updateHabitUseCase } from '../../domain/use-cases/habits/updateHabit';
 import { completeHabitUseCase } from '../../domain/use-cases/habits/completeHabit';
 import { registerExpenseUseCase } from '../../domain/use-cases/finance/registerExpense';
 import { registerIncomeUseCase } from '../../domain/use-cases/finance/registerIncome';
@@ -74,6 +75,12 @@ interface AppState {
     frequency: HabitFrequency,
     category: HabitCategory,
   ) => Promise<void>;
+  updateHabit: (
+    habitId: string,
+    name: string,
+    frequency: HabitFrequency,
+    category: HabitCategory,
+  ) => Promise<boolean>;
   archiveHabit: (habitId: string) => Promise<boolean>;
   completeHabit: (habitId: string) => Promise<boolean>;
   addExpense: (
@@ -344,6 +351,17 @@ export const useAppStore = create<AppState>((set) => ({
     });
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+  },
+  async updateHabit(habitId, name, frequency, category) {
+    const wasUpdated = await updateHabitUseCase(repositories.habitRepository, {
+      habitId,
+      name,
+      frequency,
+      category,
+    });
+    const snapshots = await refreshSnapshotsWithProgression();
+    set({ ...snapshots });
+    return wasUpdated;
   },
   async archiveHabit(habitId) {
     const wasArchived = await archiveHabitUseCase(

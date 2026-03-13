@@ -4,6 +4,7 @@ import type { Habit, HabitStats } from '../../domain/entities/Habit';
 import type {
   CreateHabitInput,
   HabitRepository,
+  UpdateHabitInput,
 } from '../../domain/repositories/HabitRepository';
 import { clamp } from '../../shared/utils/formatters';
 import { getDatabase } from '../database/database';
@@ -56,6 +57,28 @@ export class SQLiteHabitRepository implements HabitRepository {
       1,
       input.createdAt,
     );
+  }
+
+  async updateHabit(input: UpdateHabitInput): Promise<boolean> {
+    const db = await getDatabase();
+    const result = await db.runAsync(
+      `
+      UPDATE habits
+      SET name = ?,
+          frequency = ?,
+          target_per_week = ?,
+          category = ?
+      WHERE id = ?
+        AND is_active = 1
+      `,
+      input.name,
+      input.frequency,
+      input.targetPerWeek,
+      input.category,
+      input.id,
+    );
+
+    return result.changes > 0;
   }
 
   async archiveHabit(habitId: string): Promise<boolean> {
