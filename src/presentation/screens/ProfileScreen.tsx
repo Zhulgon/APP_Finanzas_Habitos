@@ -18,6 +18,11 @@ import {
   scheduleDailyHabitReminder,
   type HabitReminderStatus,
 } from '../../application/services/reminders';
+import {
+  clearAppEvents,
+  listRecentAppEvents,
+  type AppEvent,
+} from '../../application/services/observability';
 
 const avatarColors = ['#0f766e', '#2563eb', '#b45309', '#be123c'];
 const avatarShopCatalog: Array<{ id: string; cost: number }> = [
@@ -118,6 +123,7 @@ export const ProfileScreen = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
   const [isBackupLoading, setIsBackupLoading] = useState(false);
+  const [appEvents, setAppEvents] = useState<AppEvent[]>([]);
   const [reminderStatus, setReminderStatus] = useState<HabitReminderStatus>({
     supported: Platform.OS !== 'web',
     enabled: false,
@@ -145,7 +151,12 @@ export const ProfileScreen = () => {
       const status = await getHabitReminderStatus();
       setReminderStatus(status);
     })();
+    setAppEvents(listRecentAppEvents(12));
   }, []);
+
+  const refreshAppEvents = () => {
+    setAppEvents(listRecentAppEvents(12));
+  };
 
   const onSave = async () => {
     const result = profileSchema.safeParse({
@@ -175,6 +186,7 @@ export const ProfileScreen = () => {
         avatarItem: result.data.avatarItem,
       });
       showToast('Perfil actualizado.', 'success');
+      refreshAppEvents();
     } catch (error) {
       showToast(
         error instanceof Error ? error.message : 'No se pudo guardar.',
@@ -205,6 +217,7 @@ export const ProfileScreen = () => {
       showToast(response.message, response.ok ? 'success' : 'error');
       const status = await getHabitReminderStatus();
       setReminderStatus(status);
+      refreshAppEvents();
     } finally {
       setIsScheduling(false);
     }
@@ -217,6 +230,7 @@ export const ProfileScreen = () => {
       showToast(response.message, response.ok ? 'info' : 'error');
       const status = await getHabitReminderStatus();
       setReminderStatus(status);
+      refreshAppEvents();
     } finally {
       setIsScheduling(false);
     }
@@ -225,6 +239,7 @@ export const ProfileScreen = () => {
   const onUseStreakFreeze = async () => {
     const result = await useStreakFreeze();
     showToast(result.message, result.ok ? 'success' : 'error');
+    refreshAppEvents();
   };
 
   const onSelectAvatarItem = async (itemId: string, cost: number) => {
@@ -242,6 +257,7 @@ export const ProfileScreen = () => {
       await updateAvatar(avatarColor, itemId);
       setAvatarItem(itemId);
       showToast(`Item ${itemId} equipado.`, 'success');
+      refreshAppEvents();
     } catch (error) {
       showToast(
         error instanceof Error ? error.message : 'No se pudo equipar el item.',
@@ -258,8 +274,10 @@ export const ProfileScreen = () => {
       if (Platform.OS === 'web') {
         triggerBackupDownloadOnWeb(serializedBackup);
         showToast('Progreso guardado en un archivo.', 'success');
+        refreshAppEvents();
       } else {
         showToast('Progreso guardado localmente.', 'success');
+        refreshAppEvents();
       }
     } catch (error) {
       showToast(
@@ -287,6 +305,7 @@ export const ProfileScreen = () => {
 
       await importBackup(serializedBackup);
       showToast('Progreso restaurado correctamente.', 'success');
+      refreshAppEvents();
     } catch (error) {
       showToast(
         error instanceof Error
@@ -536,6 +555,56 @@ export const ProfileScreen = () => {
         </View>
       </SectionCard>
 
+      <SectionCard title="Actividad del sistema">
+        <View style={styles.row}>
+          <View style={styles.flex}>
+            <AppButton onPress={refreshAppEvents} variant="secondary">
+              Recargar actividad
+            </AppButton>
+          </View>
+          <View style={styles.flex}>
+            <AppButton
+              onPress={() => {
+                clearAppEvents();
+                refreshAppEvents();
+                showToast('Actividad limpiada.', 'info');
+              }}
+              variant="secondary"
+            >
+              Limpiar
+            </AppButton>
+          </View>
+        </View>
+        {appEvents.length === 0 ? (
+          <Text style={styles.statusBody}>
+            Aun no hay eventos registrados.
+          </Text>
+        ) : (
+          appEvents.map((event) => (
+            <View key={event.id} style={styles.achievementRow}>
+              <Text
+                style={[
+                  styles.achievementDot,
+                  event.level === 'error'
+                    ? styles.achievementError
+                    : event.level === 'warn'
+                      ? styles.achievementWarn
+                      : styles.achievementOn,
+                ]}
+              >
+                {event.level === 'error' ? '[!]' : event.level === 'warn' ? '[~]' : '[OK]'}
+              </Text>
+              <View style={styles.achievementText}>
+                <Text style={styles.achievementTitle}>{event.name}</Text>
+                <Text style={styles.achievementDescription}>
+                  {event.createdAt.slice(0, 19).replace('T', ' ')}
+                </Text>
+              </View>
+            </View>
+          ))
+        )}
+      </SectionCard>
+
       <SectionCard title="Soporte de racha">
         <Text style={styles.statusBody}>
           Si tuviste un dia dificil, puedes usar un comodin para proteger tu racha.
@@ -714,6 +783,12 @@ const styles = StyleSheet.create({
   },
   achievementOff: {
     color: colors.mutedText,
+  },
+  achievementWarn: {
+    color: colors.warning,
+  },
+  achievementError: {
+    color: colors.danger,
   },
   achievementText: {
     flex: 1,

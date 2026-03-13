@@ -61,6 +61,7 @@ import {
   buildRecommendationsV2,
   type RecommendationV2,
 } from '../services/recommendationEngineV2';
+import { trackAppEvent } from '../services/observability';
 import {
   buildWeeklyComparison,
   emptyWeeklyComparison,
@@ -447,7 +448,12 @@ export const useAppStore = create<AppState>((set) => ({
       await repositories.initialize();
       const snapshots = await refreshSnapshotsWithProgression();
       set({ ...snapshots, isBootstrapping: false });
+      trackAppEvent('app.bootstrap.success', 'info');
     } catch (error) {
+      trackAppEvent('app.bootstrap.error', 'error', {
+        message:
+          error instanceof Error ? error.message : 'Error al inicializar la app.',
+      });
       set({
         isBootstrapping: false,
         error:
@@ -481,6 +487,9 @@ export const useAppStore = create<AppState>((set) => ({
 
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    trackAppEvent('onboarding.completed', 'info', {
+      initialHabits: input.initialHabits.length,
+    });
   },
   async createHabit(name, frequency, category) {
     await createHabitUseCase(repositories.habitRepository, {
@@ -490,6 +499,10 @@ export const useAppStore = create<AppState>((set) => ({
     });
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    trackAppEvent('habit.created', 'info', {
+      category,
+      frequency,
+    });
   },
   async updateHabit(habitId, name, frequency, category) {
     const wasUpdated = await updateHabitUseCase(repositories.habitRepository, {
@@ -509,6 +522,10 @@ export const useAppStore = create<AppState>((set) => ({
     );
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    trackAppEvent('habit.archived', 'info', {
+      habitId,
+      archived: wasArchived,
+    });
     return wasArchived;
   },
   async completeHabit(habitId) {
@@ -521,6 +538,10 @@ export const useAppStore = create<AppState>((set) => ({
     );
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    trackAppEvent('habit.completed', wasCompleted ? 'info' : 'warn', {
+      habitId,
+      completed: wasCompleted,
+    });
     return wasCompleted;
   },
   async addExpense(amount, category, subCategory, note) {
@@ -536,6 +557,12 @@ export const useAppStore = create<AppState>((set) => ({
     );
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    trackAppEvent('finance.expense_added', 'info', {
+      amount,
+      category,
+      subCategory,
+      hasNote: Boolean(note),
+    });
   },
   async addIncome(amount) {
     await registerIncomeUseCase(
@@ -547,6 +574,9 @@ export const useAppStore = create<AppState>((set) => ({
     );
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    trackAppEvent('finance.income_added', 'info', {
+      amount,
+    });
   },
   async setMonthlyBudget(category, amount) {
     await setMonthlyBudgetUseCase(
@@ -559,12 +589,16 @@ export const useAppStore = create<AppState>((set) => ({
     set({ ...snapshots });
   },
   async exportBackup() {
+    trackAppEvent('backup.export.requested', 'info');
     return repositories.backupRepository.exportBackup();
   },
   async importBackup(serializedBackup) {
     await repositories.backupRepository.importBackup(serializedBackup);
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    trackAppEvent('backup.import.completed', 'info', {
+      bytes: serializedBackup.length,
+    });
   },
   async completeLesson(lessonId) {
     const wasCompleted = await completeLessonUseCase(
@@ -576,6 +610,10 @@ export const useAppStore = create<AppState>((set) => ({
     );
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    trackAppEvent('lesson.completed', wasCompleted ? 'info' : 'warn', {
+      lessonId,
+      completed: wasCompleted,
+    });
     return wasCompleted;
   },
   async buyAvatarItem(item, cost) {
@@ -686,6 +724,9 @@ export const useAppStore = create<AppState>((set) => ({
     );
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    trackAppEvent('weekly_plan.habit_target_set', 'info', {
+      target,
+    });
   },
   async setWeeklySavingsTarget(target) {
     await setWeeklySavingsTargetUseCase(
@@ -695,6 +736,9 @@ export const useAppStore = create<AppState>((set) => ({
     );
     const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+    trackAppEvent('weekly_plan.savings_target_set', 'info', {
+      target,
+    });
   },
   async updateProfile(input) {
     await repositories.profileRepository.updateProfile({

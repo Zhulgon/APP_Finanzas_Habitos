@@ -67,6 +67,12 @@ Chequeo rapido local:
 npm run verify
 ```
 
+Chequeo completo de release:
+
+```bash
+npm run verify:full
+```
+
 Smoke QA de flujo completo:
 
 ```bash
@@ -94,6 +100,8 @@ src/
   presentation/
   shared/
 docs/
+  privacy-local-data.md
+  release-checklist-v1-final.md
   software-playbook.md
   release-checklist-v1.md
   release-checklist-v1.1.md
