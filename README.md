@@ -63,6 +63,8 @@ Abrir siempre en:
 ## Sync cloud opcional (Supabase)
 
 - Configura `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
+- Genera `.env` base con `npm run setup:env`.
+- Ejecuta `sql/supabase-init.sql` en Supabase SQL Editor.
 - Ver guia: `docs/supabase-setup-v1.3.md`.
 - Si no configuras Supabase, la app funciona en modo local sin bloquearse.
 
@@ -125,6 +127,9 @@ docs/
   release-notes-v1.2.0.md
   sprint-v1.1.0-plan.md
   sprint-v1.2.0-plan.md
+sql/
+  supabase-init.sql
+  supabase-rls-production.sql
 ```
 
 ## Roadmap inmediato

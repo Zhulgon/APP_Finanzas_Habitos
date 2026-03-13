@@ -8,7 +8,13 @@ Habilitar autenticacion por correo (OTP real) y sincronizacion remota multi-disp
 
 ## 1) Variables de entorno
 
-Crear archivo `.env` (o usar variables del entorno) con:
+Genera `.env` automaticamente:
+
+```bash
+npm run setup:env
+```
+
+Luego abre `.env` y completa:
 
 ```bash
 EXPO_PUBLIC_SUPABASE_URL=https://TU_PROYECTO.supabase.co
@@ -17,28 +23,11 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=TU_ANON_KEY
 
 Referencia: `.env.example`.
 
-## 2) Tablas SQL recomendadas
+## 2) SQL de inicializacion (prototipo)
 
-Ejecuta en el SQL editor de Supabase:
+Ejecuta el contenido de:
 
-```sql
-create table if not exists public.user_snapshots (
-  user_id text primary key,
-  email text not null,
-  snapshot jsonb not null,
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists public.sync_events (
-  id text primary key,
-  user_id text not null,
-  email text not null,
-  entity text not null,
-  action text not null,
-  payload jsonb not null,
-  created_at timestamptz not null default now()
-);
-```
+- `sql/supabase-init.sql`
 
 ## 3) Politicas (prototipo)
 
@@ -49,6 +38,10 @@ Para produccion:
 - mantener RLS activa,
 - autenticar con token de usuario,
 - crear politicas por `auth.uid()` o claim equivalente.
+
+Script recomendado de hardening:
+
+- `sql/supabase-rls-production.sql`
 
 ## 4) Flujo en app
 
@@ -67,3 +60,12 @@ Si no hay variables de Supabase:
 - sync funciona local/offline (cola local),
 - la app sigue operativa sin bloqueo.
 
+## 6) Comandos de prueba local
+
+```bash
+npm run web
+```
+
+Abrir:
+
+- `http://localhost:8085`

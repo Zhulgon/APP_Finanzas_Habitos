@@ -9,6 +9,7 @@
     "web": "expo start --web --host localhost --port 8085",
     "test": "jest",
     "test:coverage": "jest --coverage --runInBand",
+    "setup:env": "node scripts/setup-env.mjs",
     "typecheck": "tsc --noEmit",
     "verify": "npm run typecheck && npm run test -- --runInBand",
     "verify:full": "npm run verify && npx expo export --platform web"
