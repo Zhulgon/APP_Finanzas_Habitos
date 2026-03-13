@@ -14,6 +14,10 @@ import {
   buildWeeklySummaryCsv,
   downloadWeeklySummaryCsv,
 } from '../../application/services/weeklySummaryCsv';
+import {
+  buildWeeklySummaryShareText,
+  copyTextToClipboard,
+} from '../../application/services/weeklySummaryShare';
 
 const toDimensionProgress = (xp: number): number => {
   const nextLevelWindow = 240;
@@ -52,6 +56,7 @@ export const ProgressScreen = () => {
   const weeklySummary = useAppStore((state) => state.weeklySummary);
   const showToast = useUiStore((state) => state.showToast);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
+  const [isCopyingSummary, setIsCopyingSummary] = useState(false);
 
   const completedMissions = missions.filter((mission) => mission.completed).length;
   const claimedMissions = missions.filter((mission) => mission.claimed).length;
@@ -76,6 +81,25 @@ export const ProgressScreen = () => {
       );
     } finally {
       setIsExportingCsv(false);
+    }
+  };
+
+  const onCopyWeeklySummary = async () => {
+    setIsCopyingSummary(true);
+    try {
+      const text = buildWeeklySummaryShareText(
+        weeklySummary,
+        profile?.currency ?? 'COP',
+      );
+      await copyTextToClipboard(text);
+      showToast('Resumen semanal copiado.', 'success');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'No se pudo copiar el resumen.',
+        'error',
+      );
+    } finally {
+      setIsCopyingSummary(false);
     }
   };
 
@@ -164,6 +188,13 @@ export const ProgressScreen = () => {
         </Text>
         <Text style={styles.summaryHeadline}>{weeklySummary.headline}</Text>
         <Text style={styles.emptyText}>{weeklySummary.recommendation}</Text>
+        <AppButton
+          onPress={onCopyWeeklySummary}
+          variant="secondary"
+          loading={isCopyingSummary}
+        >
+          Copiar resumen
+        </AppButton>
         <AppButton onPress={onExportWeeklyCsv} loading={isExportingCsv}>
           Exportar resumen CSV
         </AppButton>
