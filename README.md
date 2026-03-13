@@ -50,6 +50,12 @@ npm test -- --runInBand
 npx expo export --platform web
 ```
 
+Chequeo rapido local:
+
+```bash
+npm run verify
+```
+
 ## Reglas de juego (base)
 
 - XP base por evento:

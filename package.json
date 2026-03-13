@@ -7,7 +7,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web --host localhost --port 8085",
-    "test": "jest"
+    "test": "jest",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm run test -- --runInBand"
   },
   "dependencies": {
     "@react-navigation/bottom-tabs": "^7.15.5",
