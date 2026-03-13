@@ -85,4 +85,9 @@ src/
 docs/
   software-playbook.md
   release-checklist-v1.md
+  sprint-v1.1.0-plan.md
 ```
+
+## Roadmap inmediato
+
+- Sprint activo sugerido: `v1.1.0` en [docs/sprint-v1.1.0-plan.md](docs/sprint-v1.1.0-plan.md)
