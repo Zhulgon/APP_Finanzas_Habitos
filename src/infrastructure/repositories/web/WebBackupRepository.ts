@@ -18,6 +18,47 @@ const backupSchema = z.object({
       currency: z.string(),
       xp: z.number().int().nonnegative(),
       level: z.number().int().positive(),
+      rank: z.enum(['novato', 'constante', 'estratega', 'maestro']).optional().default('novato'),
+      xpByDimension: z
+        .object({
+          discipline: z.number().int().nonnegative(),
+          finance: z.number().int().nonnegative(),
+          learning: z.number().int().nonnegative(),
+        })
+        .optional()
+        .default({
+          discipline: 0,
+          finance: 0,
+          learning: 0,
+        }),
+      coins: z.number().int().nonnegative().optional().default(0),
+      streakFreezes: z.number().int().nonnegative().optional().default(1),
+      lastFreezeGrantMonth: z.string().optional().default(''),
+      missionDifficulty: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional().default(1),
+      claimedMissionIds: z.array(z.string()).optional().default([]),
+      unlockedAchievementIds: z.array(z.string()).optional().default([]),
+      ownedAvatarItems: z.array(z.string()).optional().default(['seedling']),
+      rewardHistory: z
+        .array(
+          z.object({
+            id: z.string(),
+            createdAt: z.string(),
+            source: z.enum([
+              'event',
+              'mission',
+              'achievement',
+              'shop',
+              'freeze',
+              'system',
+            ]),
+            reason: z.string(),
+            xpDelta: z.number().int(),
+            coinsDelta: z.number().int(),
+            dimension: z.enum(['discipline', 'finance', 'learning', 'system']),
+          }),
+        )
+        .optional()
+        .default([]),
       avatarColor: z.string(),
       avatarItem: z.string(),
     }),

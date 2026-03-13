@@ -18,7 +18,12 @@ import {
 } from '../../application/services/reminders';
 
 const avatarColors = ['#0f766e', '#2563eb', '#b45309', '#be123c'];
-const avatarItems = ['seedling', 'book', 'coin', 'bolt'];
+const avatarShopCatalog: Array<{ id: string; cost: number }> = [
+  { id: 'seedling', cost: 0 },
+  { id: 'book', cost: 15 },
+  { id: 'coin', cost: 20 },
+  { id: 'bolt', cost: 30 },
+];
 
 const triggerBackupDownloadOnWeb = (serializedBackup: string) => {
   const documentRef = (globalThis as { document?: any }).document;
@@ -93,6 +98,9 @@ export const ProfileScreen = () => {
   const profile = useAppStore((state) => state.profile);
   const achievements = useAppStore((state) => state.achievements);
   const updateProfile = useAppStore((state) => state.updateProfile);
+  const buyAvatarItem = useAppStore((state) => state.buyAvatarItem);
+  const updateAvatar = useAppStore((state) => state.updateAvatar);
+  const useStreakFreeze = useAppStore((state) => state.useStreakFreeze);
   const exportBackup = useAppStore((state) => state.exportBackup);
   const importBackup = useAppStore((state) => state.importBackup);
   const showToast = useUiStore((state) => state.showToast);
@@ -187,6 +195,34 @@ export const ProfileScreen = () => {
     setIsScheduling(false);
   };
 
+  const onUseStreakFreeze = async () => {
+    const result = await useStreakFreeze();
+    showToast(result.message, result.ok ? 'success' : 'error');
+  };
+
+  const onSelectAvatarItem = async (itemId: string, cost: number) => {
+    const alreadyOwned = profile?.ownedAvatarItems.includes(itemId) ?? false;
+    if (!alreadyOwned && cost > 0) {
+      const purchased = await buyAvatarItem(itemId, cost);
+      if (!purchased) {
+        showToast('No tienes monedas suficientes para comprar este item.', 'error');
+        return;
+      }
+      showToast(`Item ${itemId} comprado.`, 'success');
+    }
+
+    try {
+      await updateAvatar(avatarColor, itemId);
+      setAvatarItem(itemId);
+      showToast(`Item ${itemId} equipado.`, 'success');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'No se pudo equipar el item.',
+        'error',
+      );
+    }
+  };
+
   const onSaveProgress = async () => {
     setIsBackupLoading(true);
     try {
@@ -251,6 +287,9 @@ export const ProfileScreen = () => {
             <Text style={styles.avatarText}>{avatarItem.slice(0, 2).toUpperCase()}</Text>
           </View>
           <Text style={styles.avatarLabel}>Avatar mini personalizable</Text>
+          <Text style={styles.avatarMeta}>
+            Monedas: {profile?.coins ?? 0} | Comodines racha: {profile?.streakFreezes ?? 0}
+          </Text>
         </View>
       </SectionCard>
 
@@ -309,24 +348,40 @@ export const ProfileScreen = () => {
         </View>
 
         <View style={styles.block}>
-          <Text style={styles.blockTitle}>Item del avatar</Text>
+          <Text style={styles.blockTitle}>Tienda de items (cosmeticos)</Text>
           <View style={styles.row}>
-            {avatarItems.map((item) => (
+            {avatarShopCatalog.map((item) => (
               <Pressable
-                key={item}
+                key={item.id}
                 style={[
                   styles.itemChip,
-                  avatarItem === item && styles.itemChipSelected,
+                  avatarItem === item.id && styles.itemChipSelected,
                 ]}
-                onPress={() => setAvatarItem(item)}
+                onPress={() => void onSelectAvatarItem(item.id, item.cost)}
               >
                 <Text
                   style={[
                     styles.itemChipText,
-                    avatarItem === item && styles.itemChipTextSelected,
+                    avatarItem === item.id && styles.itemChipTextSelected,
                   ]}
                 >
-                  {item}
+                  {item.id}
+                </Text>
+                <Text
+                  style={[
+                    styles.itemPrice,
+                    avatarItem === item.id
+                      ? styles.itemPriceEquipped
+                      : profile?.ownedAvatarItems.includes(item.id)
+                        ? styles.itemPriceOwned
+                        : styles.itemPriceLocked,
+                  ]}
+                >
+                  {avatarItem === item.id
+                    ? 'Equipado'
+                    : profile?.ownedAvatarItems.includes(item.id)
+                      ? 'Disponible'
+                      : `${item.cost} monedas`}
                 </Text>
               </Pressable>
             ))}
@@ -417,6 +472,15 @@ export const ProfileScreen = () => {
         </View>
       </SectionCard>
 
+      <SectionCard title="Soporte de racha">
+        <Text style={styles.statusBody}>
+          Si tuviste un dia dificil, puedes usar un comodin para proteger tu racha.
+        </Text>
+        <AppButton onPress={onUseStreakFreeze} variant="secondary">
+          Usar comodin de racha
+        </AppButton>
+      </SectionCard>
+
       <AppButton onPress={onSave} loading={isSaving}>
         Guardar perfil
       </AppButton>
@@ -457,6 +521,11 @@ const styles = StyleSheet.create({
   avatarLabel: {
     color: colors.mutedText,
     fontSize: 12,
+  },
+  avatarMeta: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '700',
   },
   block: {
     gap: spacing.sm,
@@ -501,6 +570,22 @@ const styles = StyleSheet.create({
   itemChipTextSelected: {
     color: colors.text,
     fontWeight: '700',
+  },
+  itemPrice: {
+    color: colors.mutedText,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  itemPriceEquipped: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  itemPriceOwned: {
+    color: colors.success,
+    fontWeight: '700',
+  },
+  itemPriceLocked: {
+    color: colors.warning,
   },
   timeInput: {
     minWidth: 90,

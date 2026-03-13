@@ -3,24 +3,46 @@ import type {
   BudgetProgress,
   ExpenseCategory,
   ExpenseRecord,
+  IncomeRecord,
   MonthlyFinanceSummary,
 } from '../../domain/entities/Finance';
-import type { Habit, HabitCategory, HabitFrequency, HabitStats } from '../../domain/entities/Habit';
+import type {
+  Habit,
+  HabitCategory,
+  HabitFrequency,
+  HabitStats,
+} from '../../domain/entities/Habit';
 import type { LessonWithStatus } from '../../domain/entities/Lesson';
 import type { UserProfile } from '../../domain/entities/Profile';
 import { createRepositoryBundle } from '../../infrastructure/repositories/repositoryFactory';
 import { createHabitUseCase } from '../../domain/use-cases/habits/createHabit';
+import { archiveHabitUseCase } from '../../domain/use-cases/habits/archiveHabit';
+import { updateHabitUseCase } from '../../domain/use-cases/habits/updateHabit';
 import { completeHabitUseCase } from '../../domain/use-cases/habits/completeHabit';
 import { registerExpenseUseCase } from '../../domain/use-cases/finance/registerExpense';
 import { registerIncomeUseCase } from '../../domain/use-cases/finance/registerIncome';
 import { setMonthlyBudgetUseCase } from '../../domain/use-cases/finance/setMonthlyBudget';
 import { completeLessonUseCase } from '../../domain/use-cases/learning/completeLesson';
 import {
-  buildAchievements,
   buildProgressInsights,
   type AchievementBadge,
   type ProgressInsight,
 } from '../services/progressInsights';
+import { InMemoryDomainEventBus } from '../services/InMemoryDomainEventBus';
+import { bindGamificationEngine } from '../services/GamificationEngine';
+import {
+  buildMissions,
+  findUnclaimedCompletedMissions,
+  type Mission,
+} from '../services/missions';
+import { buildAchievementsWithSpecifications } from '../services/achievementSpecifications';
+import { missionDifficultyFromRate } from '../services/gamification';
+import { toIsoDate, toMonthKey } from '../../shared/utils/date';
+import {
+  buildBalanceTelemetry,
+  type BalanceTelemetry,
+} from '../services/telemetry';
+import { subDays } from 'date-fns';
 
 interface OnboardingInput {
   name: string;
@@ -41,18 +63,40 @@ interface AppState {
   budgetProgress: BudgetProgress[];
   insights: ProgressInsight[];
   achievements: AchievementBadge[];
+  missions: Mission[];
+  telemetry: BalanceTelemetry;
   recentExpenses: ExpenseRecord[];
+  recentIncomes: IncomeRecord[];
   lessons: LessonWithStatus[];
   bootstrap: () => Promise<void>;
   finishOnboarding: (input: OnboardingInput) => Promise<void>;
-  createHabit: (name: string, frequency: HabitFrequency, category: HabitCategory) => Promise<void>;
+  createHabit: (
+    name: string,
+    frequency: HabitFrequency,
+    category: HabitCategory,
+  ) => Promise<void>;
+  updateHabit: (
+    habitId: string,
+    name: string,
+    frequency: HabitFrequency,
+    category: HabitCategory,
+  ) => Promise<boolean>;
+  archiveHabit: (habitId: string) => Promise<boolean>;
   completeHabit: (habitId: string) => Promise<boolean>;
-  addExpense: (amount: number, category: ExpenseCategory, subCategory: string, note?: string) => Promise<void>;
+  addExpense: (
+    amount: number,
+    category: ExpenseCategory,
+    subCategory: string,
+    note?: string,
+  ) => Promise<void>;
   addIncome: (amount: number) => Promise<void>;
   setMonthlyBudget: (category: ExpenseCategory, amount: number) => Promise<void>;
   exportBackup: () => Promise<string>;
   importBackup: (serializedBackup: string) => Promise<void>;
   completeLesson: (lessonId: string) => Promise<boolean>;
+  buyAvatarItem: (item: string, cost: number) => Promise<boolean>;
+  updateAvatar: (avatarColor: string, avatarItem: string) => Promise<void>;
+  useStreakFreeze: () => Promise<{ ok: boolean; message: string }>;
   updateProfile: (input: {
     name: string;
     objective: string;
@@ -65,6 +109,8 @@ interface AppState {
 }
 
 const repositories = createRepositoryBundle();
+const eventBus = new InMemoryDomainEventBus();
+bindGamificationEngine(eventBus, repositories.profileRepository);
 
 const emptyHabitStats: HabitStats = {
   activeHabitsCount: 0,
@@ -83,8 +129,15 @@ const emptyFinanceSummary: MonthlyFinanceSummary = {
 const emptyBudgetProgress: BudgetProgress[] = [];
 const emptyInsights: ProgressInsight[] = [];
 const emptyAchievements: AchievementBadge[] = [];
+const emptyMissions: Mission[] = [];
+const emptyTelemetry: BalanceTelemetry = {
+  missionCompletionRate: 0,
+  weeklyHabitRate: 0,
+  savingsRate: 0,
+  engagementRisk: 'high',
+};
 
-const refreshSnapshots = async (): Promise<{
+interface SnapshotResult {
   profile: UserProfile;
   habits: Habit[];
   habitStats: HabitStats;
@@ -92,9 +145,15 @@ const refreshSnapshots = async (): Promise<{
   budgetProgress: BudgetProgress[];
   insights: ProgressInsight[];
   achievements: AchievementBadge[];
+  missions: Mission[];
+  telemetry: BalanceTelemetry;
+  newlyUnlockedAchievementIds: string[];
   recentExpenses: ExpenseRecord[];
+  recentIncomes: IncomeRecord[];
   lessons: LessonWithStatus[];
-}> => {
+}
+
+const refreshSnapshots = async (): Promise<SnapshotResult> => {
   const [
     profile,
     habits,
@@ -102,17 +161,35 @@ const refreshSnapshots = async (): Promise<{
     financeSummary,
     budgetProgress,
     recentExpenses,
+    recentIncomes,
     lessons,
-  ] =
-    await Promise.all([
-      repositories.profileRepository.getProfile(),
-      repositories.habitRepository.listActiveHabits(),
-      repositories.habitRepository.getStats(new Date()),
-      repositories.financeRepository.getMonthlySummary(new Date()),
-      repositories.financeRepository.getBudgetProgress(new Date()),
-      repositories.financeRepository.listRecentExpenses(8),
-      repositories.lessonRepository.listLessons(),
-    ]);
+  ] = await Promise.all([
+    repositories.profileRepository.getProfile(),
+    repositories.habitRepository.listActiveHabits(),
+    repositories.habitRepository.getStats(new Date()),
+    repositories.financeRepository.getMonthlySummary(new Date()),
+    repositories.financeRepository.getBudgetProgress(new Date()),
+    repositories.financeRepository.listRecentExpenses(8),
+    repositories.financeRepository.listRecentIncomes(5),
+    repositories.lessonRepository.listLessons(),
+  ]);
+
+  const achievementResult = buildAchievementsWithSpecifications({
+    profile,
+    habitStats,
+    financeSummary,
+    budgetProgress,
+    lessons,
+    activeHabitsCount: habits.length,
+  });
+
+  const missions = buildMissions({
+    profile,
+    habitStats,
+    financeSummary,
+    lessons,
+    activeHabitsCount: habits.length,
+  });
 
   return {
     profile,
@@ -128,17 +205,87 @@ const refreshSnapshots = async (): Promise<{
       lessons,
       activeHabitsCount: habits.length,
     }),
-    achievements: buildAchievements({
-      profile,
+    achievements: achievementResult.badges,
+    missions,
+    telemetry: buildBalanceTelemetry({
+      missions,
       habitStats,
       financeSummary,
-      budgetProgress,
-      lessons,
-      activeHabitsCount: habits.length,
     }),
+    newlyUnlockedAchievementIds: achievementResult.newlyUnlockedIds,
     recentExpenses,
+    recentIncomes,
     lessons,
   };
+};
+
+const applyProgressionRewards = async (snapshots: SnapshotResult): Promise<boolean> => {
+  let hasChanges = false;
+  const currentMonth = toMonthKey(new Date());
+
+  if (snapshots.profile.lastFreezeGrantMonth !== currentMonth) {
+    await repositories.profileRepository.applyGamification({
+      streakFreezesDelta: 1,
+      lastFreezeGrantMonth: currentMonth,
+      auditSource: 'system',
+      auditReason: 'Comodin mensual otorgado',
+    });
+    hasChanges = true;
+  }
+
+  const nextDifficulty = missionDifficultyFromRate(
+    snapshots.habitStats.weeklyCompletionRate,
+  );
+
+  if (nextDifficulty !== snapshots.profile.missionDifficulty) {
+    await repositories.profileRepository.applyGamification({
+      missionDifficulty: nextDifficulty,
+    });
+    hasChanges = true;
+  }
+
+  for (const achievementId of snapshots.newlyUnlockedAchievementIds) {
+    await repositories.profileRepository.applyGamification({
+      unlockedAchievementId: achievementId,
+      dimension: 'learning',
+      totalXpDelta: 12,
+      dimensionXpDelta: 12,
+      coinsDelta: 3,
+      auditSource: 'achievement',
+      auditReason: `Logro desbloqueado: ${achievementId}`,
+    });
+    hasChanges = true;
+  }
+
+  const claimableMissions = findUnclaimedCompletedMissions(snapshots.missions);
+  for (const mission of claimableMissions) {
+    await repositories.profileRepository.applyGamification({
+      claimedMissionId: mission.id,
+      dimension: mission.rewardDimension,
+      totalXpDelta: mission.rewardXp,
+      dimensionXpDelta: mission.rewardXp,
+      coinsDelta: mission.rewardCoins,
+      auditSource: 'mission',
+      auditReason: `Mision completada: ${mission.title}`,
+    });
+    hasChanges = true;
+  }
+
+  return hasChanges;
+};
+
+const refreshSnapshotsWithProgression = async (): Promise<SnapshotResult> => {
+  let snapshots = await refreshSnapshots();
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const changed = await applyProgressionRewards(snapshots);
+    if (!changed) {
+      return snapshots;
+    }
+    snapshots = await refreshSnapshots();
+  }
+
+  return snapshots;
 };
 
 export const useAppStore = create<AppState>((set) => ({
@@ -150,18 +297,24 @@ export const useAppStore = create<AppState>((set) => ({
   budgetProgress: emptyBudgetProgress,
   insights: emptyInsights,
   achievements: emptyAchievements,
+  missions: emptyMissions,
+  telemetry: emptyTelemetry,
   recentExpenses: [],
+  recentIncomes: [],
   lessons: [],
   async bootstrap() {
     set({ isBootstrapping: true, error: undefined });
     try {
       await repositories.initialize();
-      const snapshots = await refreshSnapshots();
+      const snapshots = await refreshSnapshotsWithProgression();
       set({ ...snapshots, isBootstrapping: false });
     } catch (error) {
       set({
         isBootstrapping: false,
-        error: error instanceof Error ? error.message : 'Error al inicializar la app.',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Error al inicializar la app.',
       });
     }
   },
@@ -187,7 +340,7 @@ export const useAppStore = create<AppState>((set) => ({
       });
     }
 
-    const snapshots = await refreshSnapshots();
+    const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
   },
   async createHabit(name, frequency, category) {
@@ -196,18 +349,38 @@ export const useAppStore = create<AppState>((set) => ({
       frequency,
       category,
     });
-    const snapshots = await refreshSnapshots();
+    const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
+  },
+  async updateHabit(habitId, name, frequency, category) {
+    const wasUpdated = await updateHabitUseCase(repositories.habitRepository, {
+      habitId,
+      name,
+      frequency,
+      category,
+    });
+    const snapshots = await refreshSnapshotsWithProgression();
+    set({ ...snapshots });
+    return wasUpdated;
+  },
+  async archiveHabit(habitId) {
+    const wasArchived = await archiveHabitUseCase(
+      repositories.habitRepository,
+      habitId,
+    );
+    const snapshots = await refreshSnapshotsWithProgression();
+    set({ ...snapshots });
+    return wasArchived;
   },
   async completeHabit(habitId) {
     const wasCompleted = await completeHabitUseCase(
       {
         habitRepository: repositories.habitRepository,
-        profileRepository: repositories.profileRepository,
+        eventBus,
       },
       habitId,
     );
-    const snapshots = await refreshSnapshots();
+    const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
     return wasCompleted;
   },
@@ -215,25 +388,25 @@ export const useAppStore = create<AppState>((set) => ({
     await registerExpenseUseCase(
       {
         financeRepository: repositories.financeRepository,
-        profileRepository: repositories.profileRepository,
+        eventBus,
       },
       amount,
       category,
       subCategory,
       note,
     );
-    const snapshots = await refreshSnapshots();
+    const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
   },
   async addIncome(amount) {
     await registerIncomeUseCase(
       {
         financeRepository: repositories.financeRepository,
-        profileRepository: repositories.profileRepository,
+        eventBus,
       },
       amount,
     );
-    const snapshots = await refreshSnapshots();
+    const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
   },
   async setMonthlyBudget(category, amount) {
@@ -243,7 +416,7 @@ export const useAppStore = create<AppState>((set) => ({
       amount,
       new Date(),
     );
-    const snapshots = await refreshSnapshots();
+    const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
   },
   async exportBackup() {
@@ -251,26 +424,126 @@ export const useAppStore = create<AppState>((set) => ({
   },
   async importBackup(serializedBackup) {
     await repositories.backupRepository.importBackup(serializedBackup);
-    const snapshots = await refreshSnapshots();
+    const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
   },
   async completeLesson(lessonId) {
     const wasCompleted = await completeLessonUseCase(
       {
         lessonRepository: repositories.lessonRepository,
-        profileRepository: repositories.profileRepository,
+        eventBus,
       },
       lessonId,
     );
-    const snapshots = await refreshSnapshots();
+    const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
     return wasCompleted;
+  },
+  async buyAvatarItem(item, cost) {
+    const profile = await repositories.profileRepository.getProfile();
+    if (profile.ownedAvatarItems.includes(item)) {
+      return true;
+    }
+    if (profile.coins < cost) {
+      return false;
+    }
+
+    await repositories.profileRepository.applyGamification({
+      coinsDelta: -Math.max(0, cost),
+      unlockAvatarItem: item,
+      auditSource: 'shop',
+      auditReason: `Compra item avatar: ${item}`,
+    });
+
+    const snapshots = await refreshSnapshotsWithProgression();
+    set({ ...snapshots });
+    return true;
+  },
+  async updateAvatar(avatarColor, avatarItem) {
+    const current = await repositories.profileRepository.getProfile();
+    await repositories.profileRepository.updateProfile({
+      name: current.name,
+      objective: current.objective,
+      monthlyIncome: current.monthlyIncome,
+      monthlySavingsGoal: current.monthlySavingsGoal,
+      currency: current.currency,
+      avatarColor,
+      avatarItem,
+    });
+
+    const snapshots = await refreshSnapshotsWithProgression();
+    set({ ...snapshots });
+  },
+  async useStreakFreeze() {
+    const profile = await repositories.profileRepository.getProfile();
+    if (profile.streakFreezes <= 0) {
+      return {
+        ok: false,
+        message: 'No tienes comodines disponibles.',
+      };
+    }
+
+    const activeHabits = await repositories.habitRepository.listActiveHabits();
+    if (activeHabits.length === 0) {
+      return {
+        ok: false,
+        message: 'Necesitas al menos un habito activo para usar comodin.',
+      };
+    }
+
+    const referenceDate = new Date();
+    const completionDates = await repositories.habitRepository.listCompletionDates(
+      referenceDate,
+      14,
+    );
+    const completionSet = new Set(completionDates);
+
+    let missedDate: string | null = null;
+    for (let dayOffset = 1; dayOffset <= 7; dayOffset += 1) {
+      const dayIso = toIsoDate(subDays(referenceDate, dayOffset));
+      if (!completionSet.has(dayIso)) {
+        missedDate = dayIso;
+        break;
+      }
+    }
+
+    if (!missedDate) {
+      return {
+        ok: false,
+        message: 'No hay un dia perdido reciente para proteger.',
+      };
+    }
+
+    const applied = await repositories.habitRepository.logCompletion(
+      activeHabits[0].id,
+      missedDate,
+    );
+
+    if (!applied) {
+      return {
+        ok: false,
+        message: 'Ese dia ya estaba protegido.',
+      };
+    }
+
+    await repositories.profileRepository.applyGamification({
+      streakFreezesDelta: -1,
+      auditSource: 'freeze',
+      auditReason: `Comodin usado para proteger ${missedDate}`,
+    });
+
+    const snapshots = await refreshSnapshotsWithProgression();
+    set({ ...snapshots });
+    return {
+      ok: true,
+      message: `Racha protegida para ${missedDate}.`,
+    };
   },
   async updateProfile(input) {
     await repositories.profileRepository.updateProfile({
       ...input,
     });
-    const snapshots = await refreshSnapshots();
+    const snapshots = await refreshSnapshotsWithProgression();
     set({ ...snapshots });
   },
 }));

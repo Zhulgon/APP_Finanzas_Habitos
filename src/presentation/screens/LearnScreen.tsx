@@ -4,11 +4,13 @@ import { ScreenContainer } from '../components/ScreenContainer';
 import { colors, radius, spacing } from '../../shared/theme/tokens';
 import { EmptyState } from '../components/EmptyState';
 import { useUiStore } from '../stores/useUiStore';
+import { xpForAction } from '../../application/services/gamification';
 
 export const LearnScreen = () => {
   const lessons = useAppStore((state) => state.lessons);
   const completeLesson = useAppStore((state) => state.completeLesson);
   const showToast = useUiStore((state) => state.showToast);
+  const lessonXp = xpForAction('lesson_completed');
 
   return (
     <ScreenContainer>
@@ -40,7 +42,7 @@ export const LearnScreen = () => {
                 void (async () => {
                   const wasCompleted = await completeLesson(lesson.id);
                   if (wasCompleted) {
-                    showToast('Leccion completada (+15 XP).', 'success');
+                    showToast(`Leccion completada (+${lessonXp} XP base).`, 'success');
                   } else {
                     showToast('Esta leccion ya estaba completada.', 'info');
                   }
@@ -48,7 +50,7 @@ export const LearnScreen = () => {
               }}
             >
               <Text style={styles.buttonText}>
-                {lesson.completed ? 'Ya aprendida' : 'Marcar aprendida (+15 XP)'}
+                {lesson.completed ? 'Ya aprendida' : `Marcar aprendida (+${lessonXp} XP base)`}
               </Text>
             </Pressable>
           </View>

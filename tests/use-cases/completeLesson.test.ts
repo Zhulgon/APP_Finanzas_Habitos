@@ -1,53 +1,41 @@
 import { completeLessonUseCase } from '../../src/domain/use-cases/learning/completeLesson';
-import {
-  createLessonRepositoryMock,
-  createProfileRepositoryMock,
-} from '../helpers/repositoryMocks';
+import { createLessonRepositoryMock } from '../helpers/repositoryMocks';
+import { InMemoryDomainEventBus } from '../../src/application/services/InMemoryDomainEventBus';
 
 describe('completeLessonUseCase', () => {
-  it('suma xp cuando una leccion se completa por primera vez', async () => {
-    const addXpSpy = jest.fn(async () => ({
-      name: '',
-      objective: '',
-      monthlyIncome: 0,
-      monthlySavingsGoal: 0,
-      currency: 'COP',
-      xp: 15,
-      level: 1,
-      avatarColor: '#0f766e',
-      avatarItem: 'seedling',
-    }));
+  it('publica evento cuando una leccion se completa por primera vez', async () => {
     const lessonRepository = createLessonRepositoryMock({
       markLessonCompleted: async () => true,
     });
-    const profileRepository = createProfileRepositoryMock({
-      addXp: addXpSpy,
-    });
+    const eventBus = new InMemoryDomainEventBus();
+    const handler = jest.fn(async (_event: any) => {});
+    eventBus.subscribe('lesson.completed', handler);
 
     const result = await completeLessonUseCase(
-      { lessonRepository, profileRepository },
+      { lessonRepository, eventBus },
       'lesson_1',
     );
 
     expect(result).toBe(true);
-    expect(addXpSpy).toHaveBeenCalledWith(15);
+    expect(handler).toHaveBeenCalledTimes(1);
+    const event = handler.mock.calls[0]?.[0] as { payload: { lessonId: string } };
+    expect(event.payload.lessonId).toBe('lesson_1');
   });
 
-  it('no suma xp si la leccion ya estaba completada', async () => {
-    const addXpSpy = jest.fn();
+  it('no publica evento si la leccion ya estaba completada', async () => {
     const lessonRepository = createLessonRepositoryMock({
       markLessonCompleted: async () => false,
     });
-    const profileRepository = createProfileRepositoryMock({
-      addXp: addXpSpy,
-    });
+    const eventBus = new InMemoryDomainEventBus();
+    const handler = jest.fn(async (_event: any) => {});
+    eventBus.subscribe('lesson.completed', handler);
 
     const result = await completeLessonUseCase(
-      { lessonRepository, profileRepository },
+      { lessonRepository, eventBus },
       'lesson_1',
     );
 
     expect(result).toBe(false);
-    expect(addXpSpy).not.toHaveBeenCalled();
+    expect(handler).not.toHaveBeenCalled();
   });
 });

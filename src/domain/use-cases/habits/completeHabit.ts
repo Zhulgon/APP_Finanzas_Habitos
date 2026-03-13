@@ -1,11 +1,11 @@
 import type { HabitRepository } from '../../repositories/HabitRepository';
-import type { ProfileRepository } from '../../repositories/ProfileRepository';
-import { xpForAction } from '../../../application/services/gamification';
+import type { DomainEventBus } from '../../events/DomainEventBus';
 import { toIsoDate } from '../../../shared/utils/date';
+import { createId } from '../../../shared/utils/id';
 
 interface Deps {
   habitRepository: HabitRepository;
-  profileRepository: ProfileRepository;
+  eventBus?: DomainEventBus;
 }
 
 export const completeHabitUseCase = async (
@@ -22,6 +22,15 @@ export const completeHabitUseCase = async (
     return false;
   }
 
-  await deps.profileRepository.addXp(xpForAction('habit_completion'));
+  await deps.eventBus?.publish({
+    id: createId('evt_habit_completed'),
+    type: 'habit.completed',
+    occurredAt: new Date().toISOString(),
+    payload: {
+      habitId,
+      completedAt: toIsoDate(completedAt),
+    },
+  });
+
   return true;
 };

@@ -48,6 +48,20 @@ const defaultProfile: UserProfile = {
   currency: 'COP',
   xp: 0,
   level: 1,
+  rank: 'novato',
+  xpByDimension: {
+    discipline: 0,
+    finance: 0,
+    learning: 0,
+  },
+  coins: 0,
+  streakFreezes: 1,
+  lastFreezeGrantMonth: '',
+  missionDifficulty: 1,
+  claimedMissionIds: [],
+  unlockedAchievementIds: [],
+  ownedAvatarItems: ['seedling'],
+  rewardHistory: [],
   avatarColor: '#0f766e',
   avatarItem: 'seedling',
 };
@@ -81,6 +95,14 @@ const readFromStorage = (): WebState | null => {
       profile: {
         ...defaultProfile,
         ...(parsed.profile ?? {}),
+        xpByDimension: {
+          ...defaultProfile.xpByDimension,
+          ...(parsed.profile?.xpByDimension ?? {}),
+        },
+        claimedMissionIds: parsed.profile?.claimedMissionIds ?? [],
+        unlockedAchievementIds: parsed.profile?.unlockedAchievementIds ?? [],
+        ownedAvatarItems: parsed.profile?.ownedAvatarItems ?? ['seedling'],
+        rewardHistory: parsed.profile?.rewardHistory ?? [],
       },
       counters: {
         ...defaultState().counters,

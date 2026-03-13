@@ -4,6 +4,7 @@ import type { Habit, HabitStats } from '../../domain/entities/Habit';
 import type {
   CreateHabitInput,
   HabitRepository,
+  UpdateHabitInput,
 } from '../../domain/repositories/HabitRepository';
 import { clamp } from '../../shared/utils/formatters';
 import { getDatabase } from '../database/database';
@@ -56,6 +57,43 @@ export class SQLiteHabitRepository implements HabitRepository {
       1,
       input.createdAt,
     );
+  }
+
+  async updateHabit(input: UpdateHabitInput): Promise<boolean> {
+    const db = await getDatabase();
+    const result = await db.runAsync(
+      `
+      UPDATE habits
+      SET name = ?,
+          frequency = ?,
+          target_per_week = ?,
+          category = ?
+      WHERE id = ?
+        AND is_active = 1
+      `,
+      input.name,
+      input.frequency,
+      input.targetPerWeek,
+      input.category,
+      input.id,
+    );
+
+    return result.changes > 0;
+  }
+
+  async archiveHabit(habitId: string): Promise<boolean> {
+    const db = await getDatabase();
+    const result = await db.runAsync(
+      `
+      UPDATE habits
+      SET is_active = 0
+      WHERE id = ?
+        AND is_active = 1
+      `,
+      habitId,
+    );
+
+    return result.changes > 0;
   }
 
   async logCompletion(habitId: string, completedAt: string): Promise<boolean> {
@@ -140,5 +178,23 @@ export class SQLiteHabitRepository implements HabitRepository {
       weeklyCompletionRate,
       streakDays,
     };
+  }
+
+  async listCompletionDates(referenceDate: Date, lookbackDays: number): Promise<string[]> {
+    const db = await getDatabase();
+    const safeLookbackDays = Math.max(1, lookbackDays);
+    const lowerBound = toIsoDate(subDays(referenceDate, safeLookbackDays));
+
+    const completionDays = await db.getAllAsync<{ day: string }>(
+      `
+      SELECT DISTINCT date(completed_at) as day
+      FROM habit_logs
+      WHERE date(completed_at) >= date(?)
+      ORDER BY day DESC
+      `,
+      lowerBound,
+    );
+
+    return completionDays.map((row) => row.day);
   }
 }

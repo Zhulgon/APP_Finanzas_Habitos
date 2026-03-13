@@ -6,6 +6,7 @@ import { RootNavigator } from './navigation/RootNavigator';
 import { LoadingScreen } from '../presentation/screens/LoadingScreen';
 import { ToastHost } from '../presentation/components/ToastHost';
 import { colors } from '../shared/theme/tokens';
+import { AppButton } from '../presentation/components/AppButton';
 
 export const AppRoot = () => {
   const bootstrap = useAppStore((state) => state.bootstrap);
@@ -25,6 +26,12 @@ export const AppRoot = () => {
       <View style={styles.errorContainer}>
         <Text style={styles.errorTitle}>Error de inicializacion</Text>
         <Text style={styles.errorBody}>{error}</Text>
+        <Text style={styles.errorHint}>
+          Revisa la conexion o refresca datos locales y vuelve a intentar.
+        </Text>
+        <View style={styles.retryButton}>
+          <AppButton onPress={() => void bootstrap()}>Reintentar</AppButton>
+        </View>
       </View>
     );
   }
@@ -60,5 +67,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.mutedText,
     textAlign: 'center',
+  },
+  errorHint: {
+    fontSize: 12,
+    color: colors.mutedText,
+    textAlign: 'center',
+  },
+  retryButton: {
+    width: 180,
   },
 });

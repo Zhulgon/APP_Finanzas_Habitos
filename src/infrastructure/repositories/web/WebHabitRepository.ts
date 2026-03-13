@@ -3,6 +3,7 @@ import type { Habit, HabitStats } from '../../../domain/entities/Habit';
 import type {
   CreateHabitInput,
   HabitRepository,
+  UpdateHabitInput,
 } from '../../../domain/repositories/HabitRepository';
 import { toIsoDate } from '../../../shared/utils/date';
 import { clamp } from '../../../shared/utils/formatters';
@@ -30,6 +31,63 @@ export class WebHabitRepository implements HabitRepository {
         ...state.habits,
       ],
     }));
+  }
+
+  async updateHabit(input: UpdateHabitInput): Promise<boolean> {
+    let wasUpdated = false;
+    updateWebState((state) => {
+      const nextHabits = state.habits.map((habit) => {
+        if (habit.id !== input.id || !habit.isActive) {
+          return habit;
+        }
+        wasUpdated = true;
+        return {
+          ...habit,
+          name: input.name,
+          frequency: input.frequency,
+          targetPerWeek: input.targetPerWeek,
+          category: input.category,
+        };
+      });
+
+      if (!wasUpdated) {
+        return state;
+      }
+
+      return {
+        ...state,
+        habits: nextHabits,
+      };
+    });
+
+    return wasUpdated;
+  }
+
+  async archiveHabit(habitId: string): Promise<boolean> {
+    let wasArchived = false;
+    updateWebState((state) => {
+      const nextHabits = state.habits.map((habit) => {
+        if (habit.id !== habitId || !habit.isActive) {
+          return habit;
+        }
+        wasArchived = true;
+        return {
+          ...habit,
+          isActive: false,
+        };
+      });
+
+      if (!wasArchived) {
+        return state;
+      }
+
+      return {
+        ...state,
+        habits: nextHabits,
+      };
+    });
+
+    return wasArchived;
   }
 
   async logCompletion(habitId: string, completedAt: string): Promise<boolean> {
@@ -98,5 +156,19 @@ export class WebHabitRepository implements HabitRepository {
       weeklyCompletionRate,
       streakDays,
     };
+  }
+
+  async listCompletionDates(referenceDate: Date, lookbackDays: number): Promise<string[]> {
+    const safeLookbackDays = Math.max(1, lookbackDays);
+    const state = readWebState();
+    const lowerBound = toIsoDate(subDays(referenceDate, safeLookbackDays));
+
+    const uniqueDays = new Set(
+      state.habitLogs
+        .filter((log) => log.completedAt >= lowerBound)
+        .map((log) => log.completedAt),
+    );
+
+    return Array.from(uniqueDays).sort((a, b) => (a < b ? 1 : -1));
   }
 }

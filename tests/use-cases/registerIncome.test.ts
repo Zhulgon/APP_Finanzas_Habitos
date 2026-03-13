@@ -1,11 +1,9 @@
 import { registerIncomeUseCase } from '../../src/domain/use-cases/finance/registerIncome';
-import {
-  createFinanceRepositoryMock,
-  createProfileRepositoryMock,
-} from '../helpers/repositoryMocks';
+import { createFinanceRepositoryMock } from '../helpers/repositoryMocks';
+import { InMemoryDomainEventBus } from '../../src/application/services/InMemoryDomainEventBus';
 
 describe('registerIncomeUseCase', () => {
-  it('registra ingreso tipo salary y suma xp', async () => {
+  it('registra ingreso tipo salary y publica evento', async () => {
     let capturedInput:
       | {
           type: string;
@@ -14,37 +12,27 @@ describe('registerIncomeUseCase', () => {
     const addIncomeSpy = jest.fn(async (input: { type: string }) => {
       capturedInput = input;
     });
-    const addXpSpy = jest.fn(async () => ({
-      name: '',
-      objective: '',
-      monthlyIncome: 0,
-      monthlySavingsGoal: 0,
-      currency: 'COP',
-      xp: 5,
-      level: 1,
-      avatarColor: '#0f766e',
-      avatarItem: 'seedling',
-    }));
     const financeRepository = createFinanceRepositoryMock({
       addIncome: addIncomeSpy,
     });
-    const profileRepository = createProfileRepositoryMock({
-      addXp: addXpSpy,
-    });
+    const eventBus = new InMemoryDomainEventBus();
+    const handler = jest.fn(async (_event: any) => {});
+    eventBus.subscribe('finance.income_logged', handler);
 
-    await registerIncomeUseCase({ financeRepository, profileRepository }, 2000000);
+    await registerIncomeUseCase({ financeRepository, eventBus }, 2000000);
 
     expect(addIncomeSpy).toHaveBeenCalledTimes(1);
     expect(capturedInput?.type).toBe('salary');
-    expect(addXpSpy).toHaveBeenCalledWith(5);
+    expect(handler).toHaveBeenCalledTimes(1);
+    const event = handler.mock.calls[0]?.[0] as { payload: { amount: number } };
+    expect(event.payload.amount).toBe(2000000);
   });
 
   it('falla si el ingreso es invalido', async () => {
     const financeRepository = createFinanceRepositoryMock();
-    const profileRepository = createProfileRepositoryMock();
 
     await expect(
-      registerIncomeUseCase({ financeRepository, profileRepository }, -1),
+      registerIncomeUseCase({ financeRepository }, -1),
     ).rejects.toThrow('El ingreso debe ser mayor a cero.');
   });
 });

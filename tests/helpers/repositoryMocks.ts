@@ -34,6 +34,20 @@ const emptyProfile: UserProfile = {
   currency: 'COP',
   xp: 0,
   level: 1,
+  rank: 'novato',
+  xpByDimension: {
+    discipline: 0,
+    finance: 0,
+    learning: 0,
+  },
+  coins: 0,
+  streakFreezes: 1,
+  lastFreezeGrantMonth: '',
+  missionDifficulty: 1,
+  claimedMissionIds: [],
+  unlockedAchievementIds: [],
+  ownedAvatarItems: ['seedling'],
+  rewardHistory: [],
   avatarColor: '#0f766e',
   avatarItem: 'seedling',
 };
@@ -43,8 +57,11 @@ export const createHabitRepositoryMock = (
 ): HabitRepository => ({
   listActiveHabits: async (): Promise<Habit[]> => [],
   createHabit: async () => {},
+  updateHabit: async () => false,
+  archiveHabit: async () => false,
   logCompletion: async () => false,
   getStats: async () => emptyHabitStats,
+  listCompletionDates: async (): Promise<string[]> => [],
   ...overrides,
 });
 
@@ -75,5 +92,6 @@ export const createProfileRepositoryMock = (
   getProfile: async () => emptyProfile,
   updateProfile: async () => {},
   addXp: async () => emptyProfile,
+  applyGamification: async () => emptyProfile,
   ...overrides,
 });
