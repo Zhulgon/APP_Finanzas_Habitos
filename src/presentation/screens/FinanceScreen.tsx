@@ -1,4 +1,4 @@
-import { startOfMonth, subDays } from 'date-fns';
+import { startOfMonth, startOfWeek, subDays } from 'date-fns';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ExpenseCategory } from '../../domain/entities/Finance';
@@ -27,6 +27,7 @@ import {
 } from '../../application/services/financeFilters';
 
 const expenseCategories: ExpenseCategory[] = ['fixed', 'variable', 'services'];
+type RangePreset = 'today' | 'week' | '7d' | '30d' | 'month' | 'custom';
 
 export const FinanceScreen = () => {
   const profile = useAppStore((state) => state.profile);
@@ -47,6 +48,7 @@ export const FinanceScreen = () => {
   const [budgetAmount, setBudgetAmount] = useState('');
   const [dateFrom, setDateFrom] = useState(() => toIsoDate(subDays(new Date(), 29)));
   const [dateTo, setDateTo] = useState(() => toIsoDate(new Date()));
+  const [rangePreset, setRangePreset] = useState<RangePreset>('30d');
   const [isSavingIncome, setIsSavingIncome] = useState(false);
   const [isSavingExpense, setIsSavingExpense] = useState(false);
   const [isSavingBudget, setIsSavingBudget] = useState(false);
@@ -87,12 +89,38 @@ export const FinanceScreen = () => {
     const endDate = new Date();
     setDateTo(toIsoDate(endDate));
     setDateFrom(toIsoDate(subDays(endDate, days - 1)));
+    setRangePreset(days === 7 ? '7d' : '30d');
   };
 
   const onApplyCurrentMonth = () => {
     const endDate = new Date();
     setDateTo(toIsoDate(endDate));
     setDateFrom(toIsoDate(startOfMonth(endDate)));
+    setRangePreset('month');
+  };
+
+  const onApplyToday = () => {
+    const current = toIsoDate(new Date());
+    setDateFrom(current);
+    setDateTo(current);
+    setRangePreset('today');
+  };
+
+  const onApplyCurrentWeek = () => {
+    const endDate = new Date();
+    setDateTo(toIsoDate(endDate));
+    setDateFrom(toIsoDate(startOfWeek(endDate, { weekStartsOn: 1 })));
+    setRangePreset('week');
+  };
+
+  const onChangeFrom = (value: string) => {
+    setDateFrom(value);
+    setRangePreset('custom');
+  };
+
+  const onChangeTo = (value: string) => {
+    setDateTo(value);
+    setRangePreset('custom');
   };
 
   const onAddIncome = async () => {
@@ -207,26 +235,57 @@ export const FinanceScreen = () => {
             label="Desde"
             placeholder="YYYY-MM-DD"
             value={dateFrom}
-            onChangeText={setDateFrom}
+            onChangeText={onChangeFrom}
             style={styles.dateInput}
           />
           <AppInput
             label="Hasta"
             placeholder="YYYY-MM-DD"
             value={dateTo}
-            onChangeText={setDateTo}
+            onChangeText={onChangeTo}
             style={styles.dateInput}
           />
         </View>
         <View style={styles.row}>
-          <Pressable style={styles.filterChip} onPress={() => onApplyDaysRange(7)}>
-            <Text style={styles.filterChipText}>Ultimos 7 dias</Text>
+          <Pressable
+            style={[styles.filterChip, rangePreset === 'today' && styles.filterChipSelected]}
+            onPress={onApplyToday}
+          >
+            <Text style={[styles.filterChipText, rangePreset === 'today' && styles.filterChipTextSelected]}>
+              Hoy
+            </Text>
           </Pressable>
-          <Pressable style={styles.filterChip} onPress={() => onApplyDaysRange(30)}>
-            <Text style={styles.filterChipText}>Ultimos 30 dias</Text>
+          <Pressable
+            style={[styles.filterChip, rangePreset === 'week' && styles.filterChipSelected]}
+            onPress={onApplyCurrentWeek}
+          >
+            <Text style={[styles.filterChipText, rangePreset === 'week' && styles.filterChipTextSelected]}>
+              Esta semana
+            </Text>
           </Pressable>
-          <Pressable style={styles.filterChip} onPress={onApplyCurrentMonth}>
-            <Text style={styles.filterChipText}>Mes actual</Text>
+          <Pressable
+            style={[styles.filterChip, rangePreset === '7d' && styles.filterChipSelected]}
+            onPress={() => onApplyDaysRange(7)}
+          >
+            <Text style={[styles.filterChipText, rangePreset === '7d' && styles.filterChipTextSelected]}>
+              Ultimos 7 dias
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.filterChip, rangePreset === '30d' && styles.filterChipSelected]}
+            onPress={() => onApplyDaysRange(30)}
+          >
+            <Text style={[styles.filterChipText, rangePreset === '30d' && styles.filterChipTextSelected]}>
+              Ultimos 30 dias
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.filterChip, rangePreset === 'month' && styles.filterChipSelected]}
+            onPress={onApplyCurrentMonth}
+          >
+            <Text style={[styles.filterChipText, rangePreset === 'month' && styles.filterChipTextSelected]}>
+              Mes actual
+            </Text>
           </Pressable>
         </View>
         {!rangeValidation.ok ? (
@@ -469,6 +528,13 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 12,
     fontWeight: '600',
+  },
+  filterChipSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  filterChipTextSelected: {
+    color: colors.primary,
   },
   rangeError: {
     color: colors.danger,

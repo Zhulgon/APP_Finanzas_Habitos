@@ -48,8 +48,8 @@ Hacer la app mas util en uso real diario con foco en:
 1. [x] `Notificaciones`: robustecer `scheduleDailyHabitReminder` y manejo de permisos/errores.
 2. [x] `Resumen semanal`: crear servicio `weeklySummary.ts` (habitos, finanzas, gamificacion).
 3. [x] `CSV`: boton en `Progreso` para exportar resumen semanal.
-4. [ ] `UX Home`: rediseno de bloques de prioridad diaria y llamados a la accion.
-5. [ ] `Finanzas`: presets de filtros y resumen por rango.
+4. [x] `UX Home`: rediseno de bloques de prioridad diaria y llamados a la accion.
+5. [x] `Finanzas`: presets de filtros y resumen por rango.
 6. [x] `Pruebas`: unitarias para servicio semanal y export CSV.
 7. [ ] `QA`: checklist manual de recordatorios + persistencia + export.
 
