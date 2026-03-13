@@ -9,7 +9,19 @@ import type {
   SyncRepository,
 } from '../../../domain/repositories/SyncRepository';
 import { createId } from '../../../shared/utils/id';
-import { readWebState, updateWebState } from './storage';
+import {
+  getSupabaseConfig,
+  pullSnapshotFromSupabase,
+  pushSyncEventsToSupabase,
+  upsertSnapshotToSupabase,
+} from '../../cloud/supabaseGateway';
+import {
+  normalizeWebState,
+  readWebState,
+  replaceWebState,
+  updateWebState,
+  type WebState,
+} from './storage';
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -54,6 +66,69 @@ export class WebSyncRepository implements SyncRepository {
     return readWebState().sync.queue.slice(0, Math.max(1, limit));
   }
 
+  async pullLatestSnapshot(session: AuthSession | null) {
+    if (!session) {
+      return {
+        ok: false,
+        applied: false,
+        message: 'No hay sesion activa para traer datos.',
+      };
+    }
+
+    const state = readWebState();
+    const supabase = getSupabaseConfig();
+    if (!state.sync.cloudEnabled || !supabase || session.provider === 'guest') {
+      return {
+        ok: true,
+        applied: false,
+        message: 'Sync remoto no configurado o sesion invitado.',
+      };
+    }
+
+    try {
+      const remote = await pullSnapshotFromSupabase(supabase, session);
+      if (!remote.snapshot || typeof remote.snapshot !== 'object') {
+        return {
+          ok: true,
+          applied: false,
+          message: 'No hay snapshot remoto para este usuario.',
+        };
+      }
+
+      replaceWebState(normalizeWebState(remote.snapshot as Partial<WebState>));
+      updateWebState((current) => ({
+        ...current,
+        sync: {
+          ...current.sync,
+          lastStatus: 'success',
+          lastSyncedAt: remote.updatedAt ?? nowIso(),
+        },
+      }));
+
+      return {
+        ok: true,
+        applied: true,
+        message: 'Snapshot remoto aplicado correctamente.',
+      };
+    } catch (error) {
+      updateWebState((current) => ({
+        ...current,
+        sync: {
+          ...current.sync,
+          lastStatus: 'error',
+        },
+      }));
+      return {
+        ok: false,
+        applied: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'No se pudo traer snapshot remoto.',
+      };
+    }
+  }
+
   async flush(session: AuthSession | null): Promise<FlushSyncResult> {
     if (!session) {
       return {
@@ -65,11 +140,16 @@ export class WebSyncRepository implements SyncRepository {
       };
     }
 
-    const before = readWebState().sync.queue;
+    const currentState = readWebState();
+    const before = currentState.sync.queue;
     const pendingBefore = before.filter((item) => item.status === 'pending').length;
     const timestamp = nowIso();
 
-    if (pendingBefore === 0) {
+    const supabase = getSupabaseConfig();
+    const remoteEnabled =
+      currentState.sync.cloudEnabled && Boolean(supabase) && session.provider !== 'guest';
+
+    if (pendingBefore === 0 && !remoteEnabled) {
       updateWebState((state) => ({
         ...state,
         sync: {
@@ -87,38 +167,119 @@ export class WebSyncRepository implements SyncRepository {
       };
     }
 
+    if (!remoteEnabled) {
+      updateWebState((state) => ({
+        ...state,
+        sync: {
+          ...state.sync,
+          lastStatus: 'running',
+          queue: state.sync.queue.map((item): SyncQueueItem =>
+            item.status !== 'pending'
+              ? item
+              : {
+                  ...item,
+                  status: 'synced',
+                  attempts: item.attempts + 1,
+                  updatedAt: timestamp,
+                },
+          ),
+        },
+      }));
+
+      updateWebState((state) => ({
+        ...state,
+        sync: {
+          ...state.sync,
+          lastStatus: 'success',
+          lastSyncedAt: timestamp,
+        },
+      }));
+
+      return {
+        processed: pendingBefore,
+        remaining: 0,
+        ok: true,
+        message: `Sincronizacion local completada para ${session.email}.`,
+      };
+    }
+
     updateWebState((state) => ({
       ...state,
       sync: {
         ...state.sync,
         lastStatus: 'running',
-        queue: state.sync.queue.map((item): SyncQueueItem =>
-          item.status !== 'pending'
-            ? item
-            : {
-                ...item,
-                status: 'synced',
-                attempts: item.attempts + 1,
-                updatedAt: timestamp,
-              },
-        ),
       },
     }));
 
-    updateWebState((state) => ({
-      ...state,
-      sync: {
-        ...state.sync,
-        lastStatus: 'success',
-        lastSyncedAt: timestamp,
-      },
-    }));
+    try {
+      const snapshotBeforeMarking = readWebState();
+      const pendingItems = snapshotBeforeMarking.sync.queue.filter(
+        (item) => item.status === 'pending',
+      );
 
-    return {
-      processed: pendingBefore,
-      remaining: 0,
-      ok: true,
-      message: `Sincronizacion local completada para ${session.email}.`,
-    };
+      if (pendingItems.length > 0) {
+        await pushSyncEventsToSupabase(supabase!, session, pendingItems);
+      }
+      await upsertSnapshotToSupabase(supabase!, session, snapshotBeforeMarking);
+
+      updateWebState((state) => ({
+        ...state,
+        sync: {
+          ...state.sync,
+          queue: state.sync.queue.map((item): SyncQueueItem =>
+            item.status !== 'pending'
+              ? item
+              : {
+                  ...item,
+                  status: 'synced',
+                  attempts: item.attempts + 1,
+                  updatedAt: timestamp,
+                },
+          ),
+          lastStatus: 'success',
+          lastSyncedAt: timestamp,
+        },
+      }));
+
+      return {
+        processed: pendingBefore,
+        remaining: 0,
+        ok: true,
+        message: `Sincronizacion remota completada para ${session.email}.`,
+      };
+    } catch (error) {
+      updateWebState((state) => ({
+        ...state,
+        sync: {
+          ...state.sync,
+          queue: state.sync.queue.map((item): SyncQueueItem => {
+            if (item.status !== 'pending') {
+              return item;
+            }
+            const attempts = item.attempts + 1;
+            return {
+              ...item,
+              attempts,
+              updatedAt: timestamp,
+              status: attempts >= 3 ? 'failed' : 'pending',
+            };
+          }),
+          lastStatus: 'error',
+        },
+      }));
+
+      const remaining = readWebState().sync.queue.filter(
+        (item) => item.status === 'pending',
+      ).length;
+      return {
+        processed: 0,
+        remaining,
+        ok: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'No se pudo completar sincronizacion remota.',
+      };
+    }
   }
 }

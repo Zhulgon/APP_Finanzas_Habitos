@@ -32,6 +32,7 @@ import { signInAsGuestUseCase } from '../../domain/use-cases/auth/signInAsGuest'
 import { signOutUseCase } from '../../domain/use-cases/auth/signOut';
 import { enqueueSyncItemUseCase } from '../../domain/use-cases/sync/enqueueSyncItem';
 import { flushSyncQueueUseCase } from '../../domain/use-cases/sync/flushSyncQueue';
+import { pullLatestSnapshotUseCase } from '../../domain/use-cases/sync/pullLatestSnapshot';
 import { getWeeklyPlanProgressUseCase } from '../../domain/use-cases/weekly-plan/getWeeklyPlanProgress';
 import { setWeeklyHabitTargetUseCase } from '../../domain/use-cases/weekly-plan/setWeeklyHabitTarget';
 import { setWeeklySavingsTargetUseCase } from '../../domain/use-cases/weekly-plan/setWeeklySavingsTarget';
@@ -121,6 +122,7 @@ interface AppState {
   signInAsGuest: () => Promise<void>;
   signOut: () => Promise<void>;
   flushCloudSync: () => Promise<{ ok: boolean; message: string }>;
+  pullCloudSync: () => Promise<{ ok: boolean; message: string; applied: boolean }>;
   finishOnboarding: (input: OnboardingInput) => Promise<void>;
   createHabit: (
     name: string,
@@ -605,13 +607,35 @@ export const useAppStore = create<AppState>((set, get) => {
       message: result.message,
     };
   },
+  async pullCloudSync() {
+    const result = await pullLatestSnapshotUseCase(
+      repositories.syncRepository,
+      get().authSession,
+    );
+    await refreshSyncSummary();
+    if (result.applied) {
+      const snapshots = await refreshSnapshotsWithProgression();
+      set({ ...snapshots });
+    }
+    trackAppEvent(
+      'sync.pull',
+      result.ok ? 'info' : 'warn',
+      {
+        applied: result.applied,
+      },
+    );
+    return result;
+  },
   async bootstrap() {
     set({ isBootstrapping: true, error: undefined });
     try {
       await repositories.initialize();
-      const [snapshots, authSession, syncSummary] = await Promise.all([
+      const authSession = await repositories.authRepository.getSession();
+      if (authSession) {
+        await pullLatestSnapshotUseCase(repositories.syncRepository, authSession);
+      }
+      const [snapshots, syncSummary] = await Promise.all([
         refreshSnapshotsWithProgression(),
-        repositories.authRepository.getSession(),
         repositories.syncRepository.getSummary(),
       ]);
       set({

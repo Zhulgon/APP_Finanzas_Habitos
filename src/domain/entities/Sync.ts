@@ -26,3 +26,8 @@ export interface FlushSyncResult {
   message: string;
 }
 
+export interface PullSyncResult {
+  ok: boolean;
+  applied: boolean;
+  message: string;
+}

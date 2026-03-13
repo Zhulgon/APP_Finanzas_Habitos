@@ -49,6 +49,21 @@ export class NativeSyncRepository implements SyncRepository {
     return queue.slice(0, Math.max(1, limit));
   }
 
+  async pullLatestSnapshot(session: AuthSession | null) {
+    if (!session) {
+      return {
+        ok: false,
+        applied: false,
+        message: 'Sesion requerida para sincronizar.',
+      };
+    }
+    return {
+      ok: true,
+      applied: false,
+      message: 'Sync remoto no habilitado en modo nativo local.',
+    };
+  }
+
   async flush(session: AuthSession | null): Promise<FlushSyncResult> {
     const pendingBefore = queue.filter((item) => item.status === 'pending').length;
     if (!session) {

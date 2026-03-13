@@ -32,6 +32,7 @@ Aplicacion personal para gestionar habitos, finanzas y progreso gamificado.
   - pulso USD/COP via API con fallback local seguro
   - autenticacion base por correo (codigo local prototipo) y modo invitado
   - cola de sincronizacion offline-first (pending/sync/flush) visible en Perfil
+  - soporte opcional para Supabase (OTP real + snapshot remoto multi-dispositivo)
 
 ## Stack tecnico
 
@@ -58,6 +59,12 @@ Abrir siempre en:
 - Desde `Perfil` puedes:
   - `Guardar progreso` (descarga archivo JSON)
   - `Restaurar progreso` (cargar archivo JSON)
+
+## Sync cloud opcional (Supabase)
+
+- Configura `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
+- Ver guia: `docs/supabase-setup-v1.3.md`.
+- Si no configuras Supabase, la app funciona en modo local sin bloquearse.
 
 ## Calidad
 
@@ -108,6 +115,7 @@ src/
 docs/
   privacy-local-data.md
   release-checklist-v1-final.md
+  supabase-setup-v1.3.md
   v1.3-commercial-sprint-plan.md
   software-playbook.md
   release-checklist-v1.md

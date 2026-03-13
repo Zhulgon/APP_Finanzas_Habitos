@@ -5,6 +5,11 @@ import type {
 } from '../../../domain/entities/Auth';
 import type { AuthRepository } from '../../../domain/repositories/AuthRepository';
 import { createId } from '../../../shared/utils/id';
+import {
+  getSupabaseConfig,
+  requestSupabaseOtp,
+  verifySupabaseOtp,
+} from '../../cloud/supabaseGateway';
 import { updateWebState, readWebState } from './storage';
 
 const CODE_LENGTH = 6;
@@ -27,6 +32,28 @@ export class WebAuthRepository implements AuthRepository {
       return {
         ok: false,
         message: 'Ingresa un correo valido.',
+      };
+    }
+
+    const supabase = getSupabaseConfig();
+    if (supabase) {
+      const response = await requestSupabaseOtp(supabase, normalizedEmail);
+      if (!response.ok) {
+        return response;
+      }
+
+      updateWebState((state) => ({
+        ...state,
+        auth: {
+          ...state.auth,
+          pendingEmail: normalizedEmail,
+          challenge: undefined,
+        },
+      }));
+
+      return {
+        ok: true,
+        message: 'Codigo enviado al correo (Supabase).',
       };
     }
 
@@ -59,6 +86,43 @@ export class WebAuthRepository implements AuthRepository {
     const state = readWebState();
     const normalizedEmail = normalizeEmail(email);
     const safeCode = code.trim().slice(0, CODE_LENGTH);
+    if (state.auth.pendingEmail && state.auth.pendingEmail !== normalizedEmail) {
+      return {
+        ok: false,
+        message: 'El correo no coincide con el codigo solicitado.',
+      };
+    }
+
+    const supabase = getSupabaseConfig();
+    if (supabase) {
+      const verifyResult = await verifySupabaseOtp(supabase, normalizedEmail, safeCode);
+      if (!verifyResult.ok) {
+        return verifyResult;
+      }
+
+      const session: AuthSession = {
+        userId: verifyResult.userId ?? `email:${normalizedEmail}`,
+        email: normalizedEmail,
+        provider: 'email_magic_code',
+        signedInAt: new Date().toISOString(),
+        cloudAccessToken: verifyResult.accessToken,
+      };
+
+      updateWebState((current) => ({
+        ...current,
+        auth: {
+          session,
+          pendingEmail: '',
+        },
+      }));
+
+      return {
+        ok: true,
+        message: 'Sesion iniciada correctamente (Supabase).',
+        session,
+      };
+    }
+
     const challenge = state.auth.challenge;
 
     if (!challenge) {
@@ -90,7 +154,7 @@ export class WebAuthRepository implements AuthRepository {
     }
 
     const session: AuthSession = {
-      userId: createId('usr'),
+      userId: `email:${normalizedEmail}`,
       email: normalizedEmail,
       provider: 'email_magic_code',
       signedInAt: new Date().toISOString(),
@@ -140,4 +204,3 @@ export class WebAuthRepository implements AuthRepository {
     }));
   }
 }
-

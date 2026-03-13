@@ -85,7 +85,7 @@ const defaultProfile: UserProfile = {
   avatarItem: 'seedling',
 };
 
-const defaultState = (): WebState => ({
+export const defaultWebState = (): WebState => ({
   habits: [],
   habitLogs: [],
   weeklyPlans: [],
@@ -110,7 +110,47 @@ const defaultState = (): WebState => ({
   },
 });
 
-let inMemoryFallback = defaultState();
+let inMemoryFallback = defaultWebState();
+
+export const normalizeWebState = (
+  parsed: Partial<WebState> | null | undefined,
+): WebState => {
+  if (!parsed) {
+    return defaultWebState();
+  }
+
+  return {
+    ...defaultWebState(),
+    ...parsed,
+    profile: {
+      ...defaultProfile,
+      ...(parsed.profile ?? {}),
+      xpByDimension: {
+        ...defaultProfile.xpByDimension,
+        ...(parsed.profile?.xpByDimension ?? {}),
+      },
+      claimedMissionIds: parsed.profile?.claimedMissionIds ?? [],
+      unlockedAchievementIds: parsed.profile?.unlockedAchievementIds ?? [],
+      ownedAvatarItems: parsed.profile?.ownedAvatarItems ?? ['seedling'],
+      rewardHistory: parsed.profile?.rewardHistory ?? [],
+    },
+    counters: {
+      ...defaultWebState().counters,
+      ...(parsed.counters ?? {}),
+    },
+    auth: {
+      ...defaultWebState().auth,
+      ...(parsed.auth ?? {}),
+    },
+    sync: {
+      ...defaultWebState().sync,
+      ...(parsed.sync ?? {}),
+      queue: parsed.sync?.queue ?? [],
+    },
+    weeklyPlans: parsed.weeklyPlans ?? [],
+    budgets: parsed.budgets ?? [],
+  };
+};
 
 const readFromStorage = (): WebState | null => {
   try {
@@ -119,37 +159,7 @@ const readFromStorage = (): WebState | null => {
       return null;
     }
     const parsed = JSON.parse(raw) as Partial<WebState>;
-    return {
-      ...defaultState(),
-      ...parsed,
-      profile: {
-        ...defaultProfile,
-        ...(parsed.profile ?? {}),
-        xpByDimension: {
-          ...defaultProfile.xpByDimension,
-          ...(parsed.profile?.xpByDimension ?? {}),
-        },
-        claimedMissionIds: parsed.profile?.claimedMissionIds ?? [],
-        unlockedAchievementIds: parsed.profile?.unlockedAchievementIds ?? [],
-        ownedAvatarItems: parsed.profile?.ownedAvatarItems ?? ['seedling'],
-        rewardHistory: parsed.profile?.rewardHistory ?? [],
-      },
-      counters: {
-        ...defaultState().counters,
-        ...(parsed.counters ?? {}),
-      },
-      auth: {
-        ...defaultState().auth,
-        ...(parsed.auth ?? {}),
-      },
-      sync: {
-        ...defaultState().sync,
-        ...(parsed.sync ?? {}),
-        queue: parsed.sync?.queue ?? [],
-      },
-      weeklyPlans: parsed.weeklyPlans ?? [],
-      budgets: parsed.budgets ?? [],
-    };
+    return normalizeWebState(parsed);
   } catch {
     return null;
   }

@@ -5,6 +5,7 @@ export interface AuthSession {
   email: string;
   provider: AuthProvider;
   signedInAt: string;
+  cloudAccessToken?: string;
 }
 
 export interface AuthChallenge {
@@ -25,4 +26,3 @@ export interface AuthVerifyCodeResult {
   message: string;
   session?: AuthSession;
 }
-

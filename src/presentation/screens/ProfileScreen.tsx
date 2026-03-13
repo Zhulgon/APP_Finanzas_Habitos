@@ -105,6 +105,7 @@ export const ProfileScreen = () => {
   const authSession = useAppStore((state) => state.authSession);
   const syncSummary = useAppStore((state) => state.syncSummary);
   const flushCloudSync = useAppStore((state) => state.flushCloudSync);
+  const pullCloudSync = useAppStore((state) => state.pullCloudSync);
   const signOut = useAppStore((state) => state.signOut);
   const profile = useAppStore((state) => state.profile);
   const achievements = useAppStore((state) => state.achievements);
@@ -324,6 +325,12 @@ export const ProfileScreen = () => {
 
   const onFlushSync = async () => {
     const result = await flushCloudSync();
+    showToast(result.message, result.ok ? 'success' : 'info');
+    refreshAppEvents();
+  };
+
+  const onPullSync = async () => {
+    const result = await pullCloudSync();
     showToast(result.message, result.ok ? 'success' : 'info');
     refreshAppEvents();
   };
@@ -590,6 +597,13 @@ export const ProfileScreen = () => {
               Sincronizar ahora
             </AppButton>
           </View>
+          <View style={styles.flex}>
+            <AppButton onPress={onPullSync} variant="secondary">
+              Traer desde nube
+            </AppButton>
+          </View>
+        </View>
+        <View style={styles.row}>
           <View style={styles.flex}>
             <AppButton onPress={onSignOut} variant="secondary">
               Cerrar sesion

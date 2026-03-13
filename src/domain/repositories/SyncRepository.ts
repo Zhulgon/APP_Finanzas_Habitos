@@ -1,5 +1,10 @@
 import type { AuthSession } from '../entities/Auth';
-import type { FlushSyncResult, SyncQueueItem, SyncSummary } from '../entities/Sync';
+import type {
+  FlushSyncResult,
+  PullSyncResult,
+  SyncQueueItem,
+  SyncSummary,
+} from '../entities/Sync';
 
 export interface EnqueueSyncInput {
   entity: string;
@@ -11,6 +16,6 @@ export interface SyncRepository {
   enqueue(input: EnqueueSyncInput): Promise<void>;
   getSummary(): Promise<SyncSummary>;
   flush(session: AuthSession | null): Promise<FlushSyncResult>;
+  pullLatestSnapshot(session: AuthSession | null): Promise<PullSyncResult>;
   listRecent(limit?: number): Promise<SyncQueueItem[]>;
 }
-

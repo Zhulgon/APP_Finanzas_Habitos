@@ -127,6 +127,7 @@ const backupDataSchema = z.object({
           email: z.string(),
           provider: z.enum(['email_magic_code', 'guest']),
           signedInAt: z.string(),
+          cloudAccessToken: z.string().optional(),
         })
         .nullable()
         .optional()
